@@ -1,0 +1,86 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class ExpenseModel {
+  final String id;
+  final String groupId;
+  final String description;
+  final double amount;
+  final DateTime date;
+  final List<String> participantIds;
+  final List<Map<String, dynamic>> payers; // [{userId, amount}]
+  final String createdBy;
+  final String? category;
+  final List<String>? attachments;
+  final String splitType; // equal, fixed, percent, weight
+  final List<Map<String, dynamic>>? customSplits; // [{userId, amount/percent/weight}]
+  final bool isRecurring;
+  final String? recurringRule;
+  final bool isLocked;
+  final String currency;
+
+  ExpenseModel({
+    required this.id,
+    required this.groupId,
+    required this.description,
+    required this.amount,
+    required this.date,
+    required this.participantIds,
+    required this.payers,
+    required this.createdBy,
+    this.category,
+    this.attachments,
+    required this.splitType,
+    this.customSplits,
+    this.isRecurring = false,
+    this.recurringRule,
+    this.isLocked = false,
+    this.currency = 'CLP',
+  });
+
+  factory ExpenseModel.fromMap(Map<String, dynamic> map, String id) {
+    return ExpenseModel(
+      id: id,
+      groupId: map['groupId'] ?? '',
+      description: map['description'] ?? '',
+      amount: (map['amount'] ?? 0).toDouble(),
+      date: (map['date'] as Timestamp).toDate(),
+      participantIds: List<String>.from(map['participantIds'] ?? []),
+      payers: (map['payers'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
+      createdBy: map['createdBy'] ?? '',
+      category: map['category'],
+      attachments: map['attachments'] != null ? List<String>.from(map['attachments']) : null,
+      splitType: map['splitType'] ?? 'equal',
+      customSplits: map['customSplits'] != null
+          ? (map['customSplits'] as List<dynamic>)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList()
+          : null,
+      isRecurring: map['isRecurring'] ?? false,
+      recurringRule: map['recurringRule'],
+      isLocked: map['isLocked'] ?? false,
+      currency: map['currency'] ?? 'CLP',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'groupId': groupId,
+      'description': description,
+      'amount': amount,
+      'date': Timestamp.fromDate(date),
+      'participantIds': participantIds,
+      'payers': payers,
+      'createdBy': createdBy,
+      'category': category,
+      'attachments': attachments,
+      'splitType': splitType,
+      'customSplits': customSplits,
+      'isRecurring': isRecurring,
+      'recurringRule': recurringRule,
+      'isLocked': isLocked,
+      'currency': currency,
+    };
+  }
+}

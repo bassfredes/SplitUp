@@ -1,0 +1,12 @@
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/icon/splitup-logo.png
+  color_dark: "#121212"
+  image_dark: assets/icon/splitup-logo.png
+  android_12:
+    image: assets/icon/splitup-logo.png
+    icon_background_color: "#ffffff"
+    image_dark: assets/icon/splitup-logo.png
+    icon_background_color_dark: "#121212"
+  ios: true
+  web: true
