@@ -31,13 +31,8 @@ jobs:
       - name: Install Firebase CLI
         run: curl -sL https://firebase.tools | bash
 
-      - name: Authenticate with service account
-        run: firebase login:ci --token $(cat $HOME/firebase-key.json)
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/firebase-key.json
-
-      - name: Install Firebase CLI
-        run: curl -sL https://firebase.tools | bash
+      - name: Authenticate Firebase CLI
+        run: firebase login:ci --token ${{ secrets.FIREBASE_CI_TOKEN }}
 
       - name: Install FlutterFire CLI
         run: dart pub global activate flutterfire_cli
