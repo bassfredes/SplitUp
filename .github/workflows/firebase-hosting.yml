@@ -28,17 +28,19 @@ jobs:
       - name: Write Firebase service account key to file
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPLITUP_5972D }}' > $HOME/firebase-key.json
 
+      - name: Set GOOGLE_APPLICATION_CREDENTIALS
+        run: echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-key.json" >> $GITHUB_ENV
+
       - name: Install Firebase CLI
         run: curl -sL https://firebase.tools | bash
-
-      - name: Authenticate Firebase CLI
-        run: firebase login:ci --token ${{ secrets.FIREBASE_CI_TOKEN }}
 
       - name: Install FlutterFire CLI
         run: dart pub global activate flutterfire_cli
 
       - name: Generate firebase_options.dart
         run: flutterfire configure --project=splitup-5972d --out=lib/config/firebase_options.dart --yes
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
 
       - name: Build Flutter Web
         run: flutter build web --release
