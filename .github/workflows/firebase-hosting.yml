@@ -19,11 +19,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
-        working-directory: splitup_application
 
       - name: Build Flutter Web
         run: flutter build web --release
-        working-directory: splitup_application
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -32,4 +30,3 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPLITUP_5972D }}"
           channelId: live
           projectId: splitup-5972d
-          entryPoint: splitup_application
