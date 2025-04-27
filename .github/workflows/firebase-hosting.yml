@@ -38,7 +38,7 @@ jobs:
         run: dart pub global activate flutterfire_cli
 
       - name: Generate firebase_options.dart
-        run: flutterfire configure --project=splitup-5972d --out=lib/config/firebase_options.dart --yes
+        run: flutterfire configure --project=splitup-5972d --out=lib/config/firebase_options.dart --platforms=web,android,ios --yes
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ env.GOOGLE_APPLICATION_CREDENTIALS }}
 
