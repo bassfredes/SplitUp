@@ -15,9 +15,9 @@ class LoginScreen extends StatelessWidget {
     final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
     if (user != null) {
       if (firebaseUser != null && firebaseUser.emailVerified) {
-        Future.microtask(() => Navigator.pushReplacementNamed(context, '/dashboard'));
+        Future.microtask(() => Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false));
       } else {
-        Future.microtask(() => Navigator.pushReplacementNamed(context, '/email_verification'));
+        Future.microtask(() => Navigator.pushNamedAndRemoveUntil(context, '/email_verification', (route) => false));
       }
     }
     return Scaffold(

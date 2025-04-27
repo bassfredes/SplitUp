@@ -89,15 +89,15 @@ class RootRedirector extends StatelessWidget {
       future: Future.value(firebase_auth.FirebaseAuth.instance.currentUser),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data == null) {
-          Future.microtask(() => Navigator.pushReplacementNamed(context, '/login'));
+          Future.microtask(() => Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false));
           return const SizedBox.shrink();
         }
         final user = snapshot.data!;
         if (!user.emailVerified) {
-          Future.microtask(() => Navigator.pushReplacementNamed(context, '/email_verification'));
+          Future.microtask(() => Navigator.pushNamedAndRemoveUntil(context, '/email_verification', (route) => false));
           return const SizedBox.shrink();
         }
-        Future.microtask(() => Navigator.pushReplacementNamed(context, '/dashboard'));
+        Future.microtask(() => Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false));
         return const SizedBox.shrink();
       },
     );

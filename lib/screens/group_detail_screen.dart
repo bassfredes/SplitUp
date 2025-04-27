@@ -8,6 +8,8 @@ import '../models/expense_model.dart';
 import '../providers/group_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/advanced_add_expense_screen.dart';
+import '../services/debt_calculator_service.dart';
+import '../widgets/expense_tile.dart';
 
 class GroupDetailScreen extends StatelessWidget {
   final GroupModel group;
@@ -127,241 +129,352 @@ class GroupDetailScreen extends StatelessWidget {
       ),
       backgroundColor: const Color(0xFFF6F8FA),
       body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 700),
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.07),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                group.name,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              if (group.description != null && group.description!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(group.description!, style: Theme.of(context).textTheme.bodyMedium),
+        child: SingleChildScrollView(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 700),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
               ],
-              const SizedBox(height: 24),
-              const Text('Participantes:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              FutureBuilder<List<UserModel>>(
-                future: _fetchParticipantsByIds(group.participantIds),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final users = snapshot.data ?? [];
-                  if (users.isEmpty) {
-                    return const Text('Sin participantes');
-                  }
-                  return Wrap(
-                    spacing: 8,
-                    children: users.map((user) => Chip(
-                      avatar: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
-                          ? CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!))
-                          : CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
-                      label: Text(user.name),
-                      onDeleted: () async {
-                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                        final isAdmin = group.adminId == authProvider.user?.id;
-                        if (isAdmin && user.id != group.adminId) {
-                          // Eliminar participante del grupo y redistribuir gastos
-                          await Provider.of<GroupProvider>(context, listen: false)
-                              .removeParticipantAndRedistribute(group.id, user.id);
-                          await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
-                            'participantIds': FieldValue.arrayRemove([user.id]),
-                            'roles': group.roles.where((r) => r['uid'] != user.id).toList(),
-                          });
-                          // Refrescar pantalla
-                          Navigator.of(context).pushReplacementNamed('/group_detail', arguments: group);
-                        }
-                      },
-                    )).toList(),
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
-              const Text('Gastos del grupo:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              StreamBuilder<List<ExpenseModel>>(
-                stream: _getGroupExpenses(group.id),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final expenses = snapshot.data ?? [];
-                  if (expenses.isEmpty) {
-                    return const Text('No hay gastos registrados.');
-                  }
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: expenses.length,
-                    itemBuilder: (context, index) {
-                      final e = expenses[index];
-                      return Card(
-                        elevation: 1,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        child: ListTile(
-                          leading: const Icon(Icons.receipt_long, color: Color(0xFF159d9e)),
-                          title: Text(e.description),
-                          subtitle: Text('Monto: \$${e.amount.toStringAsFixed(2)} | Fecha: ${e.date.toLocal().toString().split(' ')[0]}'),
-                          trailing: e.isLocked ? const Icon(Icons.lock, color: Colors.red) : null,
-                          onTap: () => _showExpenseDetail(context, e),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.person_add),
-                    label: const Text('Invitar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF159d9e),
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () async {
-                      final result = await showDialog(
-                        context: context,
-                        builder: (context) => _InviteParticipantDialog(groupId: group.id),
-                      );
-                      if (result == true) {
-                        final userId = Provider.of<AuthProvider>(context, listen: false).user?.id;
-                        if (userId != null) {
-                          await Provider.of<GroupProvider>(context, listen: false).loadUserGroups(userId);
-                        }
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Agregar gasto'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF159d9e),
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () async {
-                      final users = await _fetchParticipantsByIds(group.participantIds);
-                      if (!context.mounted) return;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AdvancedAddExpenseScreen(
-                            groupId: group.id,
-                            participants: users,
-                            currentUserId: Provider.of<AuthProvider>(context, listen: false).user!.id,
-                            groupCurrency: group.currency,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  group.name,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                if (group.description != null && group.description!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(group.description!, style: Theme.of(context).textTheme.bodyMedium),
                 ],
-              ),
-              const SizedBox(height: 32),
-              Builder(
-                builder: (context) {
-                  final authProvider = Provider.of<AuthProvider>(context);
-                  final user = authProvider.user;
-                  final loading = authProvider.loading;
-                  final isAdmin = user != null && group.adminId == user.id;
-                  final isOnlyParticipant = user != null && group.participantIds.length == 1 && group.participantIds.first == user.id;
-                  // Mostrar indicador de carga si el usuario aún no está disponible
-                  if (loading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  // Permitir eliminar grupo siempre si no hay historial o si el usuario es admin/único participante
-                  if (isAdmin || isOnlyParticipant || !Navigator.canPop(context)) {
-                    return ElevatedButton.icon(
-                      icon: const Icon(Icons.delete),
-                      label: const Text('Eliminar grupo'),
+                const SizedBox(height: 24),
+                const Text('Participantes:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                FutureBuilder<List<UserModel>>(
+                  future: _fetchParticipantsByIds(group.participantIds),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final users = snapshot.data ?? [];
+                    if (users.isEmpty) {
+                      return const Text('Sin participantes');
+                    }
+                    return Wrap(
+                      spacing: 8,
+                      children: users.map((user) => Chip(
+                        avatar: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
+                            ? CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!))
+                            : CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
+                        label: Text(user.name),
+                        onDeleted: () async {
+                          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                          final isAdmin = group.adminId == authProvider.user?.id;
+                          if (isAdmin && user.id != group.adminId) {
+                            // Eliminar participante del grupo y redistribuir gastos
+                            await Provider.of<GroupProvider>(context, listen: false)
+                                .removeParticipantAndRedistribute(group.id, user.id);
+                            await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
+                              'participantIds': FieldValue.arrayRemove([user.id]),
+                              'roles': group.roles.where((r) => r['uid'] != user.id).toList(),
+                            });
+                            // Refrescar pantalla
+                            Navigator.of(context).pushReplacementNamed('/group_detail', arguments: group);
+                          }
+                        },
+                      )).toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                const Text('Gastos del grupo:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                StreamBuilder<List<ExpenseModel>>(
+                  stream: _getGroupExpenses(group.id),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final expenses = snapshot.data ?? [];
+                    if (expenses.isEmpty) {
+                      return const Text('No hay gastos registrados.');
+                    }
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: expenses.length,
+                      itemBuilder: (context, index) {
+                        final e = expenses[index];
+                        return Card(
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          child: ListTile(
+                            leading: const Icon(Icons.receipt_long, color: Color(0xFF159d9e)),
+                            title: Text(e.description),
+                            subtitle: Text('Monto: \$${e.amount.toStringAsFixed(2)} | Fecha: ${e.date.toLocal().toString().split(' ')[0]}'),
+                            trailing: e.isLocked ? const Icon(Icons.lock, color: Colors.red) : null,
+                            onTap: () => _showExpenseDetail(context, e),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                // --- RESUMEN DE SALDOS Y SIMPLIFICACIÓN DE DEUDAS (con nombres) ---
+                FutureBuilder<List<UserModel>>(
+                  future: _fetchParticipantsByIds(group.participantIds),
+                  builder: (context, userSnapshot) {
+                    if (userSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final users = userSnapshot.data ?? [];
+                    final idToName = {for (var u in users) u.id: u.name};
+                    return StreamBuilder<List<ExpenseModel>>(
+                      stream: _getGroupExpenses(group.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        final expenses = snapshot.data ?? [];
+                        if (expenses.isEmpty) {
+                          return const Text('No hay gastos para calcular saldos.');
+                        }
+                        final debtService = DebtCalculatorService();
+                        final balances = debtService.calculateBalances(expenses, group);
+                        final transactions = debtService.simplifyDebts(balances);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Resumen de saldos:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            ...balances.entries.map((e) => Text(
+                              '${idToName[e.key] ?? e.key}: ${(e.value >= 0 ? "+" : "") + e.value.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: e.value > 0 ? Colors.green : (e.value < 0 ? Colors.red : Colors.black),
+                              ),
+                            )),
+                            const SizedBox(height: 16),
+                            const Text('Quién le debe a quién:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            if (transactions.isEmpty)
+                              const Text('No hay deudas pendientes.')
+                            else
+                              ...transactions.map((t) => Text(
+                                '${idToName[t['from']] ?? t['from']} le debe ${t['amount'].toStringAsFixed(2)} a ${idToName[t['to']] ?? t['to']}',
+                                style: const TextStyle(color: Colors.blueGrey),
+                              )),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                // --- LISTA DE GASTOS AGRUPADOS POR FECHA ---
+                FutureBuilder<List<UserModel>>(
+                  future: _fetchParticipantsByIds(group.participantIds),
+                  builder: (context, userSnapshot) {
+                    if (userSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final users = userSnapshot.data ?? [];
+                    final usersById = {for (var u in users) u.id: u};
+                    final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?.id ?? '';
+                    return StreamBuilder<List<ExpenseModel>>(
+                      stream: _getGroupExpenses(group.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        final expenses = snapshot.data ?? [];
+                        if (expenses.isEmpty) {
+                          return const Text('No hay gastos registrados.');
+                        }
+                        // Agrupar por fecha (yyyy-MM-dd)
+                        final Map<String, List<ExpenseModel>> grouped = {};
+                        for (final e in expenses) {
+                          final key = e.date.toLocal().toString().split(' ')[0];
+                          grouped.putIfAbsent(key, () => []).add(e);
+                        }
+                        final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: sortedKeys.length,
+                          itemBuilder: (context, idx) {
+                            final date = sortedKeys[idx];
+                            final items = grouped[date]!;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                  child: Text(
+                                    date,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                                  ),
+                                ),
+                                ...items.map((e) => ExpenseTile(
+                                      expense: e,
+                                      usersById: usersById,
+                                      currentUserId: currentUserId,
+                                      onTap: () => _showExpenseDetail(context, e),
+                                    )),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('Invitar'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+                        backgroundColor: const Color(0xFF159d9e),
                         foregroundColor: Colors.white,
                       ),
                       onPressed: () async {
-                        final confirm = await showDialog<bool>(
+                        final result = await showDialog(
                           context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Eliminar grupo'),
-                            content: const Text('¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancelar'),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Eliminar'),
-                              ),
-                            ],
-                          ),
+                          builder: (context) => _InviteParticipantDialog(groupId: group.id),
                         );
-                        if (confirm == true && user != null) {
-                          await Provider.of<GroupProvider>(context, listen: false).deleteGroup(group.id, user.id);
-                          Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+                        if (result == true) {
+                          final userId = Provider.of<AuthProvider>(context, listen: false).user?.id;
+                          if (userId != null) {
+                            await Provider.of<GroupProvider>(context, listen: false).loadUserGroups(userId);
+                          }
                         }
                       },
-                    );
-                  } else if (user != null && group.participantIds.contains(user.id)) {
-                    return ElevatedButton.icon(
-                      icon: const Icon(Icons.exit_to_app),
-                      label: const Text('Abandonar grupo'),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar gasto'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
+                        backgroundColor: const Color(0xFF159d9e),
                         foregroundColor: Colors.white,
                       ),
                       onPressed: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Abandonar grupo'),
-                            content: const Text('¿Seguro que quieres abandonar este grupo?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancelar'),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Abandonar'),
-                              ),
-                            ],
+                        final users = await _fetchParticipantsByIds(group.participantIds);
+                        if (!context.mounted) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AdvancedAddExpenseScreen(
+                              groupId: group.id,
+                              participants: users,
+                              currentUserId: Provider.of<AuthProvider>(context, listen: false).user!.id,
+                              groupCurrency: group.currency,
+                            ),
                           ),
                         );
-                        if (confirm == true) {
-                          await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
-                            'participantIds': FieldValue.arrayRemove([user.id]),
-                            'roles': group.roles.where((r) => r['uid'] != user.id).toList(),
-                          });
-                          Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
-                        }
                       },
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Builder(
+                  builder: (context) {
+                    final authProvider = Provider.of<AuthProvider>(context);
+                    final user = authProvider.user;
+                    final loading = authProvider.loading;
+                    final isAdmin = user != null && group.adminId == user.id;
+                    final isOnlyParticipant = user != null && group.participantIds.length == 1 && group.participantIds.first == user.id;
+                    // Mostrar indicador de carga si el usuario aún no está disponible
+                    if (loading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    // Permitir eliminar grupo siempre si no hay historial o si el usuario es admin/único participante
+                    if (isAdmin || isOnlyParticipant || !Navigator.canPop(context)) {
+                      return ElevatedButton.icon(
+                        icon: const Icon(Icons.delete),
+                        label: const Text('Eliminar grupo'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Eliminar grupo'),
+                              content: const Text('¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Eliminar'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true && user != null) {
+                            await Provider.of<GroupProvider>(context, listen: false).deleteGroup(group.id, user.id);
+                            Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+                          }
+                        },
+                      );
+                    } else if (user != null && group.participantIds.contains(user.id)) {
+                      return ElevatedButton.icon(
+                        icon: const Icon(Icons.exit_to_app),
+                        label: const Text('Abandonar grupo'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Abandonar grupo'),
+                              content: const Text('¿Seguro que quieres abandonar este grupo?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Abandonar'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
+                              'participantIds': FieldValue.arrayRemove([user.id]),
+                              'roles': group.roles.where((r) => r['uid'] != user.id).toList(),
+                            });
+                            Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+                          }
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
