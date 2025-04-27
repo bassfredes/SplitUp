@@ -23,7 +23,7 @@
     }
   },
   "hosting": {
-    "public": "splitup_application/build/web",
+    "public": "build/web",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
   }
 }
