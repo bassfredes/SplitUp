@@ -25,6 +25,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Install FlutterFire CLI
+        run: dart pub global activate flutterfire_cli
+
+      - name: Generate firebase_options.dart
+        run: flutterfire configure --project=splitup-5972d --out=lib/config/firebase_options.dart --yes
+
       - name: Build Flutter Web
         run: flutter build web --release
 
