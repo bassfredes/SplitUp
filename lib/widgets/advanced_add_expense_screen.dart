@@ -3,19 +3,25 @@ import 'package:image_picker/image_picker.dart';
 import '../models/expense_model.dart';
 import '../models/user_model.dart';
 import '../services/firestore_service.dart';
+import '../config/constants.dart';
+import '../widgets/breadcrumb.dart';
 
 class AdvancedAddExpenseScreen extends StatefulWidget {
   final String groupId;
   final List<UserModel> participants;
   final String currentUserId;
   final String groupCurrency;
+  final ExpenseModel? expenseToEdit;
+  final String? groupName;
   const AdvancedAddExpenseScreen({
     required this.groupId,
     required this.participants,
     required this.currentUserId,
     this.groupCurrency = 'CLP',
-    Key? key,
-  }) : super(key: key);
+    this.expenseToEdit,
+    this.groupName,
+    super.key,
+  });
 
   @override
   State<AdvancedAddExpenseScreen> createState() => _AdvancedAddExpenseScreenState();
@@ -28,39 +34,102 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
   final _categoryController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   String _currency = 'CLP';
-  final List<Map<String, String>> _currencies = [
-    {'code': 'CLP', 'label': 'CLP', 'icon': '🇨🇱'},
-    {'code': 'USD', 'label': 'USD', 'icon': '🇺🇸'},
-    {'code': 'EUR', 'label': 'EUR', 'icon': '🇪🇺'},
-  ];
+  // Usar la constante centralizada de monedas
+  final List<Map<String, String>> _currencies = kCurrencies;
   String? _selectedCategory;
   String? _imagePath;
   final ImagePicker _picker = ImagePicker();
   String _splitType = 'equal';
-  Map<String, double> _payerAmounts = {};
-  Map<String, double> _customSplits = {};
+  final Map<String, double> _payerAmounts = {};
+  final Map<String, double> _customSplits = {};
   List<String> _selectedParticipants = [];
   bool _loading = false;
   String? _selectedPayer;
+  final Map<String, TextEditingController> _splitControllers = {};
 
   @override
   void initState() {
     super.initState();
-    // Asegura que el usuario actual esté en la lista de participantes
-    final ids = widget.participants.map((u) => u.id).toSet();
-    ids.add(widget.currentUserId);
-    _selectedParticipants = ids.toList();
-    // Por defecto, el usuario actual paga todo
-    _payerAmounts[widget.currentUserId] = 0.0;
-    for (final u in widget.participants) {
-      _customSplits[u.id] = 0.0;
+    if (widget.expenseToEdit != null) {
+      final e = widget.expenseToEdit!;
+      _descController.text = e.description;
+      _amountController.text = e.amount.toStringAsFixed(e.currency == 'CLP' ? 0 : 2);
+      _categoryController.text = e.category ?? '';
+      _selectedDate = e.date;
+      _currency = e.currency;
+      // Validar categoría
+      final catKey = e.category;
+      final catList = kExpenseCategories.map((c) => c['key']).toList();
+      if (catKey != null && catList.contains(catKey)) {
+        _selectedCategory = catKey;
+      } else if (catKey != null && catKey.isNotEmpty) {
+        _selectedCategory = 'otra';
+        _categoryController.text = catKey;
+      } else {
+        _selectedCategory = null;
+      }
+      _selectedParticipants = List<String>.from(e.participantIds);
+      _splitType = e.splitType;
+      if (e.payers.isNotEmpty) {
+        _payerAmounts.clear();
+        for (final p in e.payers) {
+          _payerAmounts[p['userId']] = (p['amount'] as num).toDouble();
+        }
+        _selectedPayer = e.payers.first['userId'];
+      }
+      if (e.customSplits != null) {
+        _customSplits.clear();
+        for (final s in e.customSplits!) {
+          _customSplits[s['userId']] = (s['amount'] as num).toDouble();
+        }
+      }
+      if (e.attachments != null && e.attachments!.isNotEmpty) {
+        _imagePath = e.attachments!.first;
+      }
+    } else {
+      // Asegura que el usuario actual esté en la lista de participantes
+      final ids = widget.participants.map((u) => u.id).toSet();
+      ids.add(widget.currentUserId);
+      _selectedParticipants = ids.toList();
+      // Por defecto, el usuario actual paga todo
+      _payerAmounts[widget.currentUserId] = 0.0;
+      for (final u in widget.participants) {
+        _customSplits[u.id] = 0.0;
+      }
+      // Si el usuario actual no está en la lista de participantes, agregarlo
+      if (!widget.participants.any((u) => u.id == widget.currentUserId)) {
+        _customSplits[widget.currentUserId] = 0.0;
+      }
+      _currency = widget.groupCurrency;
+      _selectedPayer = widget.currentUserId;
     }
-    // Si el usuario actual no está en la lista de participantes, agregarlo
-    if (!widget.participants.any((u) => u.id == widget.currentUserId)) {
-      _customSplits[widget.currentUserId] = 0.0;
+    // Inicializar controladores para los splits
+    for (final id in _selectedParticipants) {
+      _splitControllers[id] = TextEditingController(
+        text: _customSplits[id]?.toStringAsFixed(_splitType == 'percent' ? 2 : (_currency == 'CLP' ? 0 : 2)) ?? '',
+      );
     }
-    _currency = widget.groupCurrency;
-    _selectedPayer = widget.currentUserId;
+  }
+
+  @override
+  void dispose() {
+    for (final c in _splitControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _updateSplitControllers() {
+    for (final id in _selectedParticipants) {
+      _splitControllers.putIfAbsent(id, () => TextEditingController());
+      _splitControllers[id]!.text = _customSplits[id]?.toStringAsFixed(_splitType == 'percent' ? 2 : (_currency == 'CLP' ? 0 : 2)) ?? '';
+    }
+    // Eliminar controladores de participantes que ya no están
+    final toRemove = _splitControllers.keys.where((id) => !_selectedParticipants.contains(id)).toList();
+    for (final id in toRemove) {
+      _splitControllers[id]?.dispose();
+      _splitControllers.remove(id);
+    }
   }
 
   void _setEqualSplit() {
@@ -72,6 +141,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
       for (final id in _selectedParticipants) {
         _customSplits[id] = share;
       }
+      _updateSplitControllers();
     });
   }
 
@@ -83,6 +153,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
       for (final id in _selectedParticipants) {
         _customSplits[id] = percent;
       }
+      _updateSplitControllers();
     });
   }
 
@@ -110,6 +181,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                     _selectedParticipants.remove(u.id);
                     _customSplits.remove(u.id);
                   }
+                  _updateSplitControllers();
                 });
               },
             );
@@ -144,7 +216,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                   if (u.photoUrl != null && u.photoUrl!.isNotEmpty)
                     CircleAvatar(backgroundImage: NetworkImage(u.photoUrl!), radius: 12)
                   else
-                    CircleAvatar(child: Text(u.name.isNotEmpty ? u.name[0].toUpperCase() : '?'), radius: 12),
+                    CircleAvatar(radius: 12, child: Text(u.name.isNotEmpty ? u.name[0].toUpperCase() : '?')),
                   const SizedBox(width: 8),
                   Text(u.name),
                 ],
@@ -205,7 +277,10 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                 DropdownMenuItem(value: 'shares', child: Text('Shares')),
               ],
               onChanged: (v) {
-                setState(() => _splitType = v ?? 'equal');
+                setState(() {
+                  _splitType = v ?? 'equal';
+                  _updateSplitControllers();
+                });
               },
             ),
             if (_splitType == 'equal' || _splitType == 'percent')
@@ -227,14 +302,14 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                   if (user.photoUrl != null && user.photoUrl!.isNotEmpty)
                     CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!), radius: 14)
                   else
-                    CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?'), radius: 14),
+                    CircleAvatar(radius: 14, child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
                   const SizedBox(width: 6),
                   Text(user.id == widget.currentUserId ? '${user.name} (Tú)' : user.name),
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 60,
                     child: TextFormField(
-                      initialValue: (_customSplits[id]?.toInt() ?? 1).toString(),
+                      controller: _splitControllers[id],
                       decoration: const InputDecoration(labelText: 'Shares'),
                       keyboardType: TextInputType.number,
                       onChanged: (v) {
@@ -260,14 +335,14 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                 if (user.photoUrl != null && user.photoUrl!.isNotEmpty)
                   CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!), radius: 14)
                 else
-                  CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?'), radius: 14),
+                  CircleAvatar(radius: 14, child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
                 const SizedBox(width: 6),
                 Text(user.id == widget.currentUserId ? '${user.name} (Tú)' : user.name, style: TextStyle(fontWeight: user.id == widget.currentUserId ? FontWeight.bold : FontWeight.normal)),
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 80,
                   child: TextFormField(
-                    initialValue: _customSplits[id]?.toStringAsFixed(_currency == 'CLP' ? 0 : 2) ?? '',
+                    controller: _splitControllers[id],
                     decoration: InputDecoration(
                       labelText: _splitType == 'percent' ? '%' : 'Monto',
                       hintText: _splitType == 'percent' ? '0' : _amountPlaceholder,
@@ -285,7 +360,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                 ),
               ],
             );
-          }).toList(),
+          }),
       ],
     );
   }
@@ -317,13 +392,13 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                   if (user.photoUrl != null && user.photoUrl!.isNotEmpty)
                     CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!), radius: 12)
                   else
-                    CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?'), radius: 12),
+                    CircleAvatar(radius: 12, child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
                   const SizedBox(width: 6),
                   Expanded(child: Text(user.id == widget.currentUserId ? '${user.name} (Tú)' : user.name)),
                   Text('${value.toStringAsFixed(2)} $_currency'),
                 ],
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -354,29 +429,54 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
     final customSplits = _splitType == 'equal'
         ? null
         : _customSplits.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
-    final expense = ExpenseModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      groupId: widget.groupId,
-      description: _descController.text.trim(),
-      amount: amount,
-      date: _selectedDate,
-      participantIds: _selectedParticipants,
-      payers: payers,
-      createdBy: widget.currentUserId,
-      category: _selectedCategory ?? _categoryController.text.trim(),
-      attachments: _imagePath != null ? [_imagePath!] : null,
-      splitType: _splitType,
-      customSplits: customSplits,
-      isRecurring: false,
-      isLocked: false,
-      currency: _currency,
-    );
-    // Guardar en Firestore
     final firestoreService = FirestoreService();
-    await firestoreService.addExpense(expense);
-    setState(() => _loading = false);
-    if (!mounted) return;
-    Navigator.pop(context, expense);
+    if (widget.expenseToEdit != null) {
+      // Modo edición
+      final updatedExpense = ExpenseModel(
+        id: widget.expenseToEdit!.id,
+        groupId: widget.groupId,
+        description: _descController.text.trim(),
+        amount: amount,
+        date: _selectedDate,
+        participantIds: _selectedParticipants,
+        payers: payers,
+        createdBy: widget.currentUserId,
+        category: _selectedCategory ?? _categoryController.text.trim(),
+        attachments: _imagePath != null ? [_imagePath!] : null,
+        splitType: _splitType,
+        customSplits: customSplits,
+        isRecurring: false,
+        isLocked: false,
+        currency: _currency,
+      );
+      await firestoreService.updateExpense(updatedExpense);
+      setState(() => _loading = false);
+      if (!mounted) return;
+      Navigator.pop(context, updatedExpense);
+    } else {
+      // Guardar en Firestore
+      final expense = ExpenseModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        groupId: widget.groupId,
+        description: _descController.text.trim(),
+        amount: amount,
+        date: _selectedDate,
+        participantIds: _selectedParticipants,
+        payers: payers,
+        createdBy: widget.currentUserId,
+        category: _selectedCategory ?? _categoryController.text.trim(),
+        attachments: _imagePath != null ? [_imagePath!] : null,
+        splitType: _splitType,
+        customSplits: customSplits,
+        isRecurring: false,
+        isLocked: false,
+        currency: _currency,
+      );
+      await firestoreService.addExpense(expense);
+      setState(() => _loading = false);
+      if (!mounted) return;
+      Navigator.pop(context, expense);
+    }
   }
 
   String get _amountPlaceholder {
@@ -399,7 +499,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
       final formatted = value.replaceAll(',', '.').replaceAll(RegExp(r'[^0-9.]'), '');
       final parts = formatted.split('.');
       if (parts.length > 2) {
-        return parts[0] + '.' + parts.sublist(1).join('');
+        return '${parts[0]}.${parts.sublist(1).join('')}';
       }
       return formatted;
     }
@@ -423,170 +523,211 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Agregar gasto avanzado'),
-        backgroundColor: const Color(0xFF159d9e),
-      ),
-      backgroundColor: const Color(0xFFF6F8FA),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF6F8FA),
+      child: SingleChildScrollView(
+        child: Center(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.95,
+            constraints: const BoxConstraints(maxWidth: 1200),
+            margin: const EdgeInsets.only(top: 20, bottom: 20),
+            padding: const EdgeInsets.all(40),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: FractionallySizedBox(
-                    widthFactor: 0.9,
-                    child: SingleChildScrollView(
-                      child: Column(
+                Breadcrumb(
+                  items: [
+                    BreadcrumbItem('Inicio', route: '/dashboard'),
+                    BreadcrumbItem(widget.groupName != null ? 'Grupo: ${widget.groupName}' : 'Grupo', route: '/group/${widget.groupId}'),
+                    BreadcrumbItem(widget.expenseToEdit != null ? 'Editando Gasto: ${widget.expenseToEdit!.description}' : 'Nuevo Gasto'),
+                  ],
+                  onTap: (i) {
+                    if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
+                    if (i == 1) Navigator.pushReplacementNamed(context, '/group/${widget.groupId}');
+                  },
+                ),
+                const SizedBox(height: 32),
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        widget.expenseToEdit != null ? 'Editando Gasto' : 'Nuevo Gasto',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildParticipantSelector(),
+                      const SizedBox(height: 28),
+                      // Monto y moneda alineados
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 32),
-                          Container(
-                            constraints: const BoxConstraints(maxWidth: 700),
-                            padding: const EdgeInsets.all(32),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(32),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.07),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
+                          Expanded(
+                            child: TextFormField(
+                              controller: _amountController,
+                              decoration: _inputDecoration(label: 'Monto total', hint: _amountPlaceholder),
+                              keyboardType: _currency == 'CLP'
+                                  ? TextInputType.number
+                                  : const TextInputType.numberWithOptions(decimal: true),
+                              validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Monto inválido' : null,
+                              onChanged: (v) {
+                                final formatted = _formatAmountInput(v);
+                                if (v != formatted) {
+                                  _amountController.text = formatted;
+                                  _amountController.selection = TextSelection.fromPosition(TextPosition(offset: formatted.length));
+                                }
+                                if (_selectedPayer != null) {
+                                  setState(() {
+                                    _payerAmounts[_selectedPayer!] = double.tryParse(formatted) ?? 0.0;
+                                  });
+                                }
+                              },
                             ),
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _buildParticipantSelector(),
-                                  const SizedBox(height: 28),
-                                  // Monto y moneda alineados
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Expanded(
-                                        child: TextFormField(
-                                          controller: _amountController,
-                                          decoration: _inputDecoration(label: 'Monto total', hint: _amountPlaceholder),
-                                          keyboardType: _currency == 'CLP'
-                                              ? TextInputType.number
-                                              : const TextInputType.numberWithOptions(decimal: true),
-                                          validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Monto inválido' : null,
-                                          onChanged: (v) {
-                                            final formatted = _formatAmountInput(v);
-                                            if (v != formatted) {
-                                              _amountController.text = formatted;
-                                              _amountController.selection = TextSelection.fromPosition(TextPosition(offset: formatted.length));
-                                            }
-                                            if (_selectedPayer != null) {
-                                              setState(() {
-                                                _payerAmounts[_selectedPayer!] = double.tryParse(formatted) ?? 0.0;
-                                              });
-                                            }
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      SizedBox(
-                                        height: 56,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[50],
-                                            borderRadius: BorderRadius.circular(16),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                                          child: DropdownButtonHideUnderline(
-                                            child: DropdownButton<String>(
-                                              value: _currency,
-                                              items: _currencies.map((c) => DropdownMenuItem<String>(
-                                                value: c['code'],
-                                                child: Row(
-                                                  children: [
-                                                    Text(c['icon'] ?? ''),
-                                                    const SizedBox(width: 4),
-                                                    Text(c['label'] ?? ''),
-                                                  ],
-                                                ),
-                                              )).toList(),
-                                              onChanged: (v) => setState(() => _currency = v ?? 'CLP'),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 28),
-                                  // ¿Quién pagó? y Fecha en filas separadas
-                                  _buildPayers(),
-                                  const SizedBox(height: 28),
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text('Agregar imagen', style: TextStyle(fontWeight: FontWeight.bold)),
-                                            const SizedBox(height: 8),
-                                            GestureDetector(
-                                              onTap: () async {
-                                                final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-                                                if (image != null) {
-                                                  setState(() => _imagePath = image.path);
-                                                }
-                                              },
-                                              child: Container(
-                                                width: 110,
-                                                height: 90,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.grey[100],
-                                                  borderRadius: BorderRadius.circular(16),
-                                                  border: Border.all(
-                                                    color: Colors.grey,
-                                                    width: 1.2,
-                                                    style: BorderStyle.solid,
-                                                  ),
-                                                ),
-                                                child: Column(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    const Icon(Icons.camera_alt, size: 32, color: Colors.grey),
-                                                    const SizedBox(height: 6),
-                                                    Text('Agregar', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                            if (_imagePath != null) ...[
-                                              const SizedBox(height: 8),
-                                              Text(_imagePath!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                            ]
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 28),
-                                  TextFormField(
-                                    controller: _descController,
-                                    decoration: _inputDecoration(label: 'Descripción', hint: 'Ej: bebidas'),
-                                    validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
-                                  ),
-                                  const SizedBox(height: 28),
-                                  // Solo dejar la segunda sección de División
-                                  _buildSplitInputs(),
-                                  const SizedBox(height: 28),
-                                  _buildSummary(),
-                                  const SizedBox(height: 60),
-                                ],
+                          ),
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            height: 56,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _currency,
+                                  items: _currencies.map((c) => DropdownMenuItem<String>(
+                                    value: c['code'],
+                                    child: Row(
+                                      children: [
+                                        Text(c['icon'] ?? ''),
+                                        const SizedBox(width: 4),
+                                        Text(c['label'] ?? ''),
+                                      ],
+                                    ),
+                                  )).toList(),
+                                  onChanged: (v) => setState(() => _currency = v ?? 'CLP'),
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 28),
+                      // ¿Quién pagó? y Fecha en filas separadas
+                      _buildPayers(),
+                      const SizedBox(height: 28),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Agregar imagen', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 8),
+                                GestureDetector(
+                                  onTap: () async {
+                                    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                                    if (image != null) {
+                                      setState(() => _imagePath = image.path);
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 110,
+                                    height: 90,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: Colors.grey,
+                                        width: 1.2,
+                                        style: BorderStyle.solid,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.camera_alt, size: 32, color: Colors.grey),
+                                        const SizedBox(height: 6),
+                                        Text('Agregar', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (_imagePath != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text(_imagePath!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                ]
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      TextFormField(
+                        controller: _descController,
+                        decoration: _inputDecoration(label: 'Descripción', hint: 'Ej: bebidas'),
+                        validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                      ),
+                      const SizedBox(height: 28),
+                      // Campo de categoría como dropdown
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedCategory,
+                              items: [
+                                ...kExpenseCategories.map((cat) => DropdownMenuItem<String>(
+                                  value: cat['key'],
+                                  child: Text(cat['label']),
+                                )),
+                              ],
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedCategory = val;
+                                  if (val != 'otra') {
+                                    _categoryController.clear();
+                                  }
+                                });
+                              },
+                              decoration: _inputDecoration(label: 'Categoría'),
+                              validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                            ),
+                          ),
+                          if (_selectedCategory == 'otra')
+                            const SizedBox(width: 12),
+                          if (_selectedCategory == 'otra')
+                            Expanded(
+                              child: TextFormField(
+                                controller: _categoryController,
+                                decoration: _inputDecoration(label: 'Otra categoría'),
+                                validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      // Solo dejar la segunda sección de División
+                      _buildSplitInputs(),
+                      const SizedBox(height: 28),
+                      _buildSummary(),
+                      const SizedBox(height: 60),
+                    ],
                   ),
                 ),
                 Positioned(
@@ -616,10 +757,10 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                         ),
                         const SizedBox(width: 16),
                         ElevatedButton.icon(
-                          icon: const Icon(Icons.save),
-                          label: const Text('Agregar gasto'),
+                          icon: Icon(widget.expenseToEdit != null ? Icons.save : Icons.add),
+                          label: Text(widget.expenseToEdit != null ? 'Guardar cambios' : 'Agregar gasto'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF159d9e),
+                            backgroundColor: kPrimaryColor,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                           ),
@@ -631,6 +772,9 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../config/constants.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
-  const EmailVerificationScreen({Key? key}) : super(key: key);
+  const EmailVerificationScreen({super.key});
 
   @override
   State<EmailVerificationScreen> createState() => _EmailVerificationScreenState();
@@ -57,7 +58,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verifica tu correo'),
-        backgroundColor: const Color(0xFF159d9e),
+        backgroundColor: kPrimaryColor,
         automaticallyImplyLeading: false,
       ),
       body: Center(
@@ -79,7 +80,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.email_outlined, size: 56, color: Color(0xFF159d9e)),
+              const Icon(Icons.email_outlined, size: 56, color: kPrimaryColor),
               const SizedBox(height: 16),
               Text('Te enviamos un correo de verificación a:', textAlign: TextAlign.center),
               const SizedBox(height: 8),
@@ -97,7 +98,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 label: const Text('Ya verifiqué mi correo'),
                 onPressed: _isReloading ? null : _checkVerification,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF159d9e),
+                  backgroundColor: kPrimaryColor,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

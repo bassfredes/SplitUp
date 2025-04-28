@@ -4,9 +4,11 @@ import '../providers/auth_provider.dart';
 import 'package:g_recaptcha_v3/g_recaptcha_v3.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import '../config/constants.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class LoginScreen extends StatelessWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,11 +23,6 @@ class LoginScreen extends StatelessWidget {
       }
     }
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Iniciar sesión'),
-        backgroundColor: const Color(0xFF159d9e),
-        elevation: 0,
-      ),
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 400),
@@ -49,7 +46,10 @@ class LoginScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 24),
                 child: Column(
                   children: [
-                    Icon(Icons.account_balance_wallet_rounded, size: 56, color: const Color(0xFF159d9e)),
+                    Image.asset(
+                      'assets/icon/splitup-logo.png',
+                      height: 100,
+                    ),
                     const SizedBox(height: 12),
                     Text('Bienvenido a SplitUp',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
@@ -68,27 +68,45 @@ class LoginScreen extends StatelessWidget {
                     if (isRegister) return const SizedBox.shrink();
                     return Column(
                       children: [
-                        Row(
-                          children: const [
-                            Expanded(child: Divider()),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 8.0),
-                              child: Text('o inicia con redes'),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              side: const BorderSide(color: Color(0xFF747775)),
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                              padding: EdgeInsets.zero,
+                              shadowColor: Colors.transparent,
                             ),
-                            Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.login),
-                          label: const Text('Iniciar sesión con Google'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF159d9e),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            onPressed: () => authProvider.signInWithGoogle(),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 20,
+                                  height: 20,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  child: SvgPicture.string(
+                                    '''<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>''',
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                const Text(
+                                  'Iniciar sesión con Google',
+                                  style: TextStyle(
+                                    color: Color(0xFF1f1f1f),
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
+                                    fontFamily: 'Roboto',
+                                    letterSpacing: 0.25,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          onPressed: () => authProvider.signInWithGoogle(),
                         ),
                       ],
                     );
@@ -104,7 +122,7 @@ class LoginScreen extends StatelessWidget {
 }
 
 class _EmailPasswordLoginForm extends StatefulWidget {
-  const _EmailPasswordLoginForm({Key? key}) : super(key: key);
+  const _EmailPasswordLoginForm();
 
   @override
   _EmailPasswordLoginFormState createState() => _EmailPasswordLoginFormState();
@@ -124,6 +142,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
   bool _isRegister = false;
   double _passwordStrength = 0;
   String _passwordStrengthLabel = '';
+  bool loading = false;
 
   @override
   void dispose() {
@@ -156,6 +175,102 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
     });
   }
 
+  Future<void> _showResetPasswordDialog() async {
+    final emailController = TextEditingController(text: _emailController.text);
+    await showDialog(
+      context: context,
+      builder: (context) {
+        String? error;
+        bool sent = false;
+        bool loading = false;
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Recuperar contraseña'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Correo electrónico',
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!, style: const TextStyle(color: Colors.red)),
+                ],
+                if (sent) ...[
+                  const SizedBox(height: 8),
+                  Text('Correo enviado. Revisa tu bandeja de entrada.', style: TextStyle(color: Colors.green)),
+                ]
+              ],
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.red,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(sent ? 'Cerrar' : 'Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimaryColor,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: (sent || loading)
+                          ? null
+                          : () async {
+                              setState(() { loading = true; error = null; });
+                              final email = emailController.text.trim();
+                              if (!email.contains('@')) {
+                                setState(() { error = 'Correo inválido'; loading = false; });
+                                return;
+                              }
+                              try {
+                                await firebase_auth.FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                                setState(() {
+                                  error = null;
+                                  sent = true;
+                                  loading = false;
+                                });
+                              } catch (e) {
+                                setState(() { error = 'Error: ${e.toString()}'; loading = false; });
+                              }
+                            },
+                      child: sent
+                          ? const Text('Correo enviado')
+                          : loading
+                              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Enviar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -169,7 +284,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
               controller: _nameController,
               decoration: InputDecoration(
                 labelText: 'Nombre completo',
-                prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF159d9e)),
+                prefixIcon: const Icon(Icons.person_outline, color: kPrimaryColor),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: Colors.grey[50],
@@ -182,19 +297,27 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             controller: _emailController,
             decoration: InputDecoration(
               labelText: 'Correo electrónico',
-              prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF159d9e)),
+              prefixIcon: const Icon(Icons.email_outlined, color: kPrimaryColor),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
               fillColor: Colors.grey[50],
             ),
             validator: (value) => value != null && value.contains('@') ? null : 'Correo inválido',
           ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _showResetPasswordDialog,
+              style: TextButton.styleFrom(foregroundColor: kPrimaryColor),
+              child: const Text('¿Olvidaste tu contraseña?'),
+            ),
+          ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _passwordController,
             decoration: InputDecoration(
               labelText: 'Contraseña',
-              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF159d9e)),
+              prefixIcon: const Icon(Icons.lock_outline, color: kPrimaryColor),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
               fillColor: Colors.grey[50],
@@ -231,7 +354,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
               controller: _repeatPasswordController,
               decoration: InputDecoration(
                 labelText: 'Repetir contraseña',
-                prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF159d9e)),
+                prefixIcon: const Icon(Icons.lock_outline, color: kPrimaryColor),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: Colors.grey[50],
@@ -284,7 +407,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF159d9e),
+              backgroundColor: kPrimaryColor,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -296,7 +419,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
               setState(() => _isRegister = !_isRegister);
             },
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF159d9e),
+              foregroundColor: kPrimaryColor,
             ),
             child: Text(_isRegister ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'),
           ),

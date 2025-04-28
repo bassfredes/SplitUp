@@ -39,6 +39,15 @@ class FirestoreService {
       .collection('expenses').doc(expense.id).set(expense.toMap());
   }
 
+  Future<void> updateExpense(ExpenseModel expense) async {
+    await _db
+        .collection('groups')
+        .doc(expense.groupId)
+        .collection('expenses')
+        .doc(expense.id)
+        .update(expense.toMap());
+  }
+
   Stream<List<ExpenseModel>> getExpenses(String groupId) {
     return _db.collection('groups').doc(groupId)
       .collection('expenses')
