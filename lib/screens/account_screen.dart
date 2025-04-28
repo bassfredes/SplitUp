@@ -48,18 +48,23 @@ class AccountScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    CircleAvatar(
-                      radius: 36,
-                      backgroundColor: kPrimaryColor,
-                      backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
-                          ? NetworkImage(user.photoUrl!)
-                          : null,
-                      child: (user.photoUrl == null || user.photoUrl!.isEmpty)
-                          ? Text(
-                              user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                              style: const TextStyle(fontSize: 32, color: Colors.white),
-                            )
-                          : null,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 28, // Igual que en dashboard
+                          backgroundColor: kPrimaryColor,
+                          backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
+                              ? NetworkImage(user.photoUrl!)
+                              : null,
+                          child: (user.photoUrl == null || user.photoUrl!.isEmpty)
+                              ? Text(
+                                  user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                                  style: const TextStyle(fontSize: 28, color: Colors.white),
+                                )
+                              : null,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Text(user.name, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
@@ -116,6 +121,27 @@ class AccountScreen extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () => Navigator.pushNamed(context, '/account/link_google'),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.account_circle),
+                      label: Text((firebaseUser?.providerData.any((p) => p.providerId == 'github.com') ?? false)
+                          ? 'Desvincular GitHub'
+                          : 'Vincular GitHub'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        side: const BorderSide(color: Colors.black),
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        if (firebaseUser?.providerData.any((p) => p.providerId == 'github.com') ?? false) {
+                          await authProvider.unlinkGitHub();
+                        } else {
+                          await authProvider.linkWithGitHub();
+                        }
+                      },
                     ),
                   ],
                 ),

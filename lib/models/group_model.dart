@@ -6,6 +6,7 @@ class GroupModel {
   final String adminId;
   final List<Map<String, String>> roles; // [{uid: ..., role: ...}]
   final String currency;
+  final String? photoUrl;
 
   GroupModel({
     required this.id,
@@ -15,6 +16,7 @@ class GroupModel {
     required this.adminId,
     required this.roles,
     this.currency = 'CLP',
+    this.photoUrl,
   });
 
   factory GroupModel.fromMap(Map<String, dynamic> map, String id) {
@@ -27,6 +29,7 @@ class GroupModel {
       roles: (map['roles'] as List<dynamic>? ?? [])
         .map((e) => Map<String, String>.from(e as Map)).toList(),
       currency: map['currency'] ?? 'CLP',
+      photoUrl: map['photoUrl'],
     );
   }
 
@@ -38,6 +41,7 @@ class GroupModel {
       'adminId': adminId,
       'roles': roles,
       'currency': currency,
+      'photoUrl': photoUrl,
     };
   }
 }

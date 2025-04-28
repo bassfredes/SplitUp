@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../models/group_model.dart';
@@ -235,6 +238,10 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
     {'code': 'USD', 'label': 'USD', 'icon': '🇺🇸'},
     {'code': 'EUR', 'label': 'EUR', 'icon': '🇪🇺'},
   ];
+  String? _imagePath;
+  final ImagePicker _picker = ImagePicker();
+  bool _uploading = false;
+  String? _uploadError;
   showDialog(
     context: context,
     useRootNavigator: false,
@@ -250,6 +257,29 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  GestureDetector(
+                    onTap: () async {
+                      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                      if (image != null) {
+                        setState(() => _imagePath = image.path);
+                      }
+                    },
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        shape: BoxShape.circle,
+                        image: _imagePath != null
+                            ? DecorationImage(image: FileImage(File(_imagePath!)), fit: BoxFit.cover)
+                            : null,
+                      ),
+                      child: _imagePath == null
+                          ? const Icon(Icons.camera_alt, color: Colors.white, size: 36)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: nameController,
                     decoration: const InputDecoration(labelText: 'Nombre del grupo'),
@@ -284,6 +314,14 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
                     const SizedBox(height: 16),
                     Text(errorMsg!, style: const TextStyle(color: Colors.red)),
                   ],
+                  if (_uploading) ...[
+                    const SizedBox(height: 12),
+                    const CircularProgressIndicator(),
+                  ],
+                  if (_uploadError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_uploadError!, style: const TextStyle(color: Colors.red)),
+                  ],
                 ],
               ),
             ),
@@ -296,31 +334,47 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
             Builder(
               builder: (dialogContext) => ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor, foregroundColor: Colors.white),
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  if (name.isEmpty) return;
-                  final group = GroupModel(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: name,
-                    description: descController.text.trim().isEmpty ? null : descController.text.trim(),
-                    participantIds: [userId],
-                    adminId: userId,
-                    roles: [
-                      {'uid': userId, 'role': 'admin'}
-                    ],
-                    currency: currency,
-                  );
-                  try {
-                    await groupProvider.createGroup(group, userId);
-                    Navigator.pop(dialogContext);
-                  } catch (e) {
-                    setState(() {
-                      errorMsg = e.toString().contains('permission-denied')
-                        ? 'No tienes permisos para crear el grupo. Verifica tus reglas de Firestore.'
-                        : 'Error al crear el grupo: ${e.toString()}';
-                    });
-                  }
-                },
+                onPressed: _uploading
+                    ? null
+                    : () async {
+                        final name = nameController.text.trim();
+                        if (name.isEmpty) return;
+                        String? photoUrl;
+                        if (_imagePath != null) {
+                          setState(() { _uploading = true; _uploadError = null; });
+                          try {
+                            final ref = FirebaseStorage.instance.ref().child('group_photos/${DateTime.now().millisecondsSinceEpoch}.jpg');
+                            final uploadTask = await ref.putFile(File(_imagePath!));
+                            photoUrl = await ref.getDownloadURL();
+                          } catch (e) {
+                            setState(() { _uploading = false; _uploadError = 'Error al subir la imagen'; });
+                            return;
+                          }
+                          setState(() { _uploading = false; });
+                        }
+                        final group = GroupModel(
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          name: name,
+                          description: descController.text.trim().isEmpty ? null : descController.text.trim(),
+                          participantIds: [userId],
+                          adminId: userId,
+                          roles: [
+                            {'uid': userId, 'role': 'admin'}
+                          ],
+                          currency: currency,
+                          photoUrl: photoUrl,
+                        );
+                        try {
+                          await groupProvider.createGroup(group, userId);
+                          Navigator.pop(dialogContext);
+                        } catch (e) {
+                          setState(() {
+                            errorMsg = e.toString().contains('permission-denied')
+                              ? 'No tienes permisos para crear el grupo. Verifica tus reglas de Firestore.'
+                              : 'Error al crear el grupo: ${e.toString()}';
+                          });
+                        }
+                      },
                 child: const Text('Crear'),
               ),
             ),
