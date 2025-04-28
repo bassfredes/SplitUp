@@ -20,7 +20,16 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signInWithGoogle() async {
     _loading = true;
     notifyListeners();
-    _user = await _authService.signInWithGoogle();
+    try {
+      _user = await _authService.signInWithGoogle();
+    } catch (e) {
+      if (e.toString().contains('popup-closed-by-user') || e.toString().contains('popup_closed')) {
+        _loading = false;
+        notifyListeners();
+        return;
+      }
+      rethrow;
+    }
     _loading = false;
     notifyListeners();
   }
@@ -62,5 +71,45 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return e.toString().replaceFirst('Exception: ', '');
     }
+  }
+
+  Future<String?> signInWithGitHub() async {
+    _loading = true;
+    notifyListeners();
+    try {
+      _user = await _authService.signInWithGitHub();
+      _loading = false;
+      notifyListeners();
+      return null;
+    } on Exception catch (e) {
+      if (e.toString().contains('popup-closed-by-user') || e.toString().contains('popup_closed')) {
+        _loading = false;
+        notifyListeners();
+        return null;
+      }
+      _loading = false;
+      notifyListeners();
+      return e.toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('[firebase_auth/link-account-other] ', '');
+    }
+  }
+
+  Future<void> linkWithGitHub() async {
+    _loading = true;
+    notifyListeners();
+    await _authService.linkWithGitHub();
+    _user = _authService.getCurrentUser();
+    _loading = false;
+    notifyListeners();
+  }
+
+  Future<void> unlinkGitHub() async {
+    _loading = true;
+    notifyListeners();
+    await _authService.unlinkGitHub();
+    _user = _authService.getCurrentUser();
+    _loading = false;
+    notifyListeners();
   }
 }

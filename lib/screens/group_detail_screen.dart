@@ -22,6 +22,8 @@ import 'dart:typed_data';
 import '../config/constants.dart';
 import '../widgets/breadcrumb.dart';
 import '../widgets/header.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final GroupModel group;
@@ -214,6 +216,247 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
+  void _showEditGroupDialog(GroupModel group) async {
+    final nameController = TextEditingController(text: group.name);
+    final descController = TextEditingController(text: group.description ?? '');
+    String? _imagePath;
+    String? _photoUrl = group.photoUrl;
+    bool _uploading = false;
+    String? _uploadError;
+    List<String> participants = List<String>.from(group.participantIds);
+    final ImagePicker _picker = ImagePicker();
+    final groupRef = FirebaseFirestore.instance.collection('groups').doc(group.id);
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // No se puede cerrar haciendo click fuera
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Editar grupo'),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: () async {
+                            final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                            if (image != null) {
+                              final allowedExtensions = ['jpg', 'jpeg', 'png'];
+                              final ext = image.name.split('.').last.toLowerCase();
+                              final bytes = await image.length();
+                              if (!allowedExtensions.contains(ext)) {
+                                setState(() => _uploadError = 'Solo se permiten imágenes JPG o PNG');
+                                return;
+                              }
+                              if (bytes > 2 * 1024 * 1024) {
+                                setState(() => _uploadError = 'La imagen no debe superar los 2MB');
+                                return;
+                              }
+                              setState(() {
+                                _imagePath = image.path;
+                                _uploadError = null;
+                              });
+                            }
+                          },
+                          child: FutureBuilder<DecorationImage?>(
+                            future: () async {
+                              if (_imagePath != null) {
+                                if (kIsWeb) {
+                                  final bytes = await XFile(_imagePath!).readAsBytes();
+                                  return DecorationImage(image: MemoryImage(bytes), fit: BoxFit.cover);
+                                } else {
+                                  return DecorationImage(image: FileImage(File(_imagePath!)), fit: BoxFit.cover);
+                                }
+                              } else if (_photoUrl?.isNotEmpty == true) {
+                                return DecorationImage(image: NetworkImage(_photoUrl!), fit: BoxFit.cover);
+                              }
+                              return null;
+                            }(),
+                            builder: (context, snapshot) {
+                              return Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  shape: BoxShape.circle,
+                                  image: snapshot.data,
+                                ),
+                                child: (_imagePath == null && (_photoUrl?.isEmpty != false))
+                                    ? const Icon(Icons.group, color: Colors.white, size: 36)
+                                    : null,
+                              );
+                            },
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Nombre del grupo'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Participantes', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    FutureBuilder<List<UserModel>>(
+                      future: _fetchParticipantsByIds(participants),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const CircularProgressIndicator();
+                        final users = snapshot.data!;
+                        return Column(
+                          children: users.map((user) => ListTile(
+                            leading: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
+                                ? CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!))
+                                : CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
+                            title: Text(user.name),
+                            subtitle: Text(user.email),
+                            trailing: (user.id != group.adminId && participants.length > 1)
+                                ? IconButton(
+                                    icon: const Icon(Icons.remove_circle, color: Colors.red),
+                                    onPressed: () {
+                                      setState(() => participants.remove(user.id));
+                                    },
+                                  )
+                                : null,
+                          )).toList(),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('Añadir participante'),
+                      onPressed: () async {
+                        final emailController = TextEditingController();
+                        String? error;
+                        await showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Invitar participante'),
+                            content: TextField(
+                              controller: emailController,
+                              decoration: const InputDecoration(labelText: 'Correo del participante'),
+                            ),
+                            actions: [
+                              if ((error ?? '').isNotEmpty)
+                                Text(error ?? '', style: const TextStyle(color: Colors.red)),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancelar'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  final email = emailController.text.trim();
+                                  final userSnap = await FirebaseFirestore.instance
+                                      .collection('users')
+                                      .where('email', isEqualTo: email)
+                                      .limit(1)
+                                      .get();
+                                  if (userSnap.docs.isEmpty) {
+                                    error = 'Usuario no encontrado';
+                                    setState(() {});
+                                    return;
+                                  }
+                                  final userId = userSnap.docs.first.id;
+                                  if (!participants.contains(userId)) {
+                                    setState(() => participants.add(userId));
+                                  }
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('Invitar'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    if (_uploading) ...[
+                      const SizedBox(height: 12),
+                      const CircularProgressIndicator(),
+                    ],
+                    if (_uploadError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(_uploadError!, style: const TextStyle(color: Colors.red)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor, foregroundColor: Colors.white),
+                onPressed: _uploading
+                    ? null
+                    : () async {
+                        String? newPhotoUrl = _photoUrl;
+                        if (_imagePath != null) {
+                          setState(() { _uploading = true; _uploadError = null; });
+                          try {
+                            print('[DEBUG] Subiendo imagen: $_imagePath');
+                            final ref = FirebaseStorage.instance.ref().child('group_photos/${DateTime.now().millisecondsSinceEpoch}.jpg');
+                            if (kIsWeb) {
+                              final bytes = await XFile(_imagePath!).readAsBytes();
+                              await ref.putData(bytes);
+                            } else {
+                              await ref.putFile(File(_imagePath!));
+                            }
+                            final url = await ref.getDownloadURL();
+                            print('[DEBUG] Imagen subida correctamente. URL: $url');
+                            newPhotoUrl = url;
+                          } catch (e, st) {
+                            print('[ERROR] Error al subir imagen: $e');
+                            print(st);
+                            setState(() { _uploading = false; _uploadError = 'Error al subir la imagen'; });
+                            return;
+                          }
+                          setState(() { _uploading = false; });
+                        }
+                        await groupRef.update({
+                          'name': nameController.text.trim(),
+                          'description': descController.text.trim(),
+                          'photoUrl': newPhotoUrl,
+                          'participantIds': participants,
+                        });
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                        setState(() {});
+                      },
+                child: const Text('Guardar'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
@@ -262,9 +505,32 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
                     },
                   ),
-                  Text(
-                    group.name,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  // --- FOTO DEL GRUPO Y BOTÓN EDITAR ---
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 36,
+                        backgroundColor: Colors.grey[300],
+                        backgroundImage: (group.photoUrl?.isNotEmpty == true)
+                            ? NetworkImage(group.photoUrl!)
+                            : null,
+                        child: (group.photoUrl?.isEmpty != false)
+                            ? const Icon(Icons.group, color: Colors.white, size: 36)
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          group.name,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.teal),
+                        tooltip: 'Editar grupo',
+                        onPressed: () => _showEditGroupDialog(group),
+                      ),
+                    ],
                   ),
                   if (group.description != null && group.description!.isNotEmpty) ...[
                     const SizedBox(height: 8),
