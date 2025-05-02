@@ -60,7 +60,7 @@ class SplitUpApp extends StatelessWidget {
         onGenerateRoute: (settings) {
           // Ruta dinámica para detalle de grupo
           if (settings.name != null && settings.name!.startsWith('/group/')) {
-            final uri = Uri.parse(settings.name!);
+            final uri = Uri.parse(settings.name!); // Keep '!' here if settings.name is guaranteed non-null by the if condition
             final segments = uri.pathSegments;
             if (segments.length >= 5 && segments[2] == 'expense' && segments[4] == 'edit') {
               final groupId = segments[1];
@@ -124,18 +124,36 @@ class RootRedirector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<firebase_auth.User?>(
-      future: Future.value(firebase_auth.FirebaseAuth.instance.currentUser),
+      future: Future.value(firebase_auth.FirebaseAuth.instance.currentUser), // Use Future.value for immediate value
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == null) {
-          Future.microtask(() => Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false));
-          return const SizedBox.shrink();
+        // It's better to handle the loading state explicitly
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator())); // Show loading indicator
         }
-        final user = snapshot.data!;
-        if (!user.emailVerified) {
-          Future.microtask(() => Navigator.pushNamedAndRemoveUntil(context, '/email_verification', (route) => false));
-          return const SizedBox.shrink();
-        }
-        Future.microtask(() => Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false));
+
+        final user = snapshot.data; // No need for ! here, check for null below
+
+        // Use WidgetsBinding.instance.addPostFrameCallback for navigation after build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!snapshot.hasData || user == null) {
+            // If no user data or user is null, navigate to login
+            if (ModalRoute.of(context)?.settings.name != '/login') {
+               Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+            }
+          } else if (!user.emailVerified) {
+            // If user exists but email is not verified, navigate to verification
+             if (ModalRoute.of(context)?.settings.name != '/email_verification') {
+               Navigator.pushNamedAndRemoveUntil(context, '/email_verification', (route) => false);
+             }
+          } else {
+            // If user exists and email is verified, navigate to dashboard
+            if (ModalRoute.of(context)?.settings.name != '/dashboard') {
+               Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+            }
+          }
+        });
+
+        // Return an empty container while navigation is pending
         return const SizedBox.shrink();
       },
     );

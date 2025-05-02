@@ -20,8 +20,11 @@ class AccountScreen extends StatelessWidget {
         onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
         onAccount: () {},
         onLogout: () async {
+          // Guardar el contexto antes del async gap
+          final navigator = Navigator.of(context);
           await authProvider.signOut();
-          Navigator.pushReplacementNamed(context, '/login');
+          // Usar el contexto guardado
+          navigator.pushReplacementNamed('/login');
         },
       ),
       backgroundColor: const Color(0xFFF6F8FA),
@@ -36,7 +39,8 @@ class AccountScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.07),
+                // Corregido: Usar Color.fromRGBO o Color.fromARGB
+                color: const Color.fromRGBO(0, 0, 0, 0.07),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),

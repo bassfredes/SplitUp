@@ -5,7 +5,6 @@ import '../models/user_model.dart';
 import '../models/group_model.dart';
 import '../widgets/advanced_add_expense_screen.dart';
 import '../widgets/header.dart';
-import '../widgets/breadcrumb.dart';
 
 class EditExpenseScreen extends StatefulWidget {
   final String groupId;
@@ -74,10 +73,28 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        appBar: Header(
+          currentRoute: '/expense_edit',
+          onDashboard: () => Navigator.pushReplacementNamed(context, '/dashboard'),
+          onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
+          onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
+          onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
     if (error != null) {
-      return Scaffold(body: Center(child: Text(error!, style: const TextStyle(color: Colors.red))));
+      return Scaffold(
+        appBar: Header(
+          currentRoute: '/expense_edit',
+          onDashboard: () => Navigator.pushReplacementNamed(context, '/dashboard'),
+          onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
+          onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
+          onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
+        ),
+        body: Center(child: Text(error!, style: const TextStyle(color: Colors.red))),
+      );
     }
     final currentUserId = participants.isNotEmpty ? participants.first.id : '';
     return Scaffold(
@@ -88,18 +105,13 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
         onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
         onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
       ),
-      backgroundColor: const Color(0xFFF6F8FA),
-      body: SingleChildScrollView(
-        child: Center(
-          child: AdvancedAddExpenseScreen(
-            groupId: widget.groupId,
-            participants: participants,
-            currentUserId: currentUserId,
-            groupCurrency: expense?.currency ?? 'CLP',
-            expenseToEdit: expense,
-            groupName: group?.name,
-          ),
-        ),
+      body: AdvancedAddExpenseScreen(
+        groupId: widget.groupId,
+        participants: participants,
+        currentUserId: currentUserId,
+        groupCurrency: expense?.currency ?? 'CLP',
+        expenseToEdit: expense,
+        groupName: group?.name,
       ),
     );
   }

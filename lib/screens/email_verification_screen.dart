@@ -70,7 +70,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.07),
+                // Corregido: Usar Color.fromRGBO o Color.fromARGB
+                color: const Color.fromRGBO(0, 0, 0, 0.07),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),

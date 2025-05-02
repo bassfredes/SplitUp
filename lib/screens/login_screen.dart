@@ -32,7 +32,7 @@ class LoginScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.07),
+                color: const Color.fromRGBO(0, 0, 0, 0.07),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
@@ -452,7 +452,16 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
                     name: _nameController.text.trim(),
                   );
                 } else {
-                  error = await authProvider.signInWithEmail(_emailController.text, _passwordController.text);
+                  final navigator = Navigator.of(context);
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+                  try {
+                    await authProvider.signInWithEmail(_emailController.text, _passwordController.text);
+                    navigator.pushReplacementNamed('/dashboard');
+                  } on firebase_auth.FirebaseAuthException catch (e) {
+                    scaffoldMessenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Error desconocido')));
+                  } catch (e) {
+                    scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+                  }
                 }
                 if (error != null) {
                   setState(() => _error = error);
@@ -479,5 +488,29 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
         ],
       ),
     );
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    try {
+      await authProvider.signInWithGoogle();
+      navigator.pushReplacementNamed('/dashboard');
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error con Google: ${e.toString()}')));
+    }
+  }
+
+  Future<void> _signInWithGitHub() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    try {
+      await authProvider.signInWithGitHub();
+      navigator.pushReplacementNamed('/dashboard');
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error con GitHub: ${e.toString()}')));
+    }
   }
 }

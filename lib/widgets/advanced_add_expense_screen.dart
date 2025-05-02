@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import '../services/firestore_service.dart';
 import '../config/constants.dart';
 import '../widgets/breadcrumb.dart';
+import '../utils/formatters.dart';
 
 class AdvancedAddExpenseScreen extends StatefulWidget {
   final String groupId;
@@ -395,7 +396,8 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                     CircleAvatar(radius: 12, child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
                   const SizedBox(width: 6),
                   Expanded(child: Text(user.id == widget.currentUserId ? '${user.name} (Tú)' : user.name)),
-                  Text('${value.toStringAsFixed(2)} $_currency'),
+                  // Usar la función formatCurrency
+                  Text(formatCurrency(value, _currency)),
                 ],
               );
             }),
@@ -523,10 +525,9 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFF6F8FA),
-      child: SingleChildScrollView(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FA),
+      body: SingleChildScrollView(
         child: Center(
           child: Container(
             width: MediaQuery.of(context).size.width * 0.95,
@@ -538,237 +539,242 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
+                  // Corregido: Usar Color.fromRGBO o Color.fromARGB
+                  color: const Color.fromRGBO(0, 0, 0, 0.07),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Stack(
               children: [
-                Breadcrumb(
-                  items: [
-                    BreadcrumbItem('Inicio', route: '/dashboard'),
-                    BreadcrumbItem(widget.groupName != null ? 'Grupo: ${widget.groupName}' : 'Grupo', route: '/group/${widget.groupId}'),
-                    BreadcrumbItem(widget.expenseToEdit != null ? 'Editando Gasto: ${widget.expenseToEdit!.description}' : 'Nuevo Gasto'),
-                  ],
-                  onTap: (i) {
-                    if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
-                    if (i == 1) Navigator.pushReplacementNamed(context, '/group/${widget.groupId}');
-                  },
-                ),
-                const SizedBox(height: 32),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        widget.expenseToEdit != null ? 'Editando Gasto' : 'Nuevo Gasto',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildParticipantSelector(),
-                      const SizedBox(height: 28),
-                      // Monto y moneda alineados
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Breadcrumb(
+                      items: [
+                        BreadcrumbItem('Inicio', route: '/dashboard'),
+                        BreadcrumbItem(widget.groupName != null ? 'Grupo: ${widget.groupName}' : 'Grupo', route: '/group/${widget.groupId}'),
+                        BreadcrumbItem(widget.expenseToEdit != null ? 'Editando Gasto: ${widget.expenseToEdit!.description}' : 'Nuevo Gasto'),
+                      ],
+                      onTap: (i) {
+                        if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
+                        if (i == 1) Navigator.pushReplacementNamed(context, '/group/${widget.groupId}');
+                      },
+                    ),
+                    const SizedBox(height: 32),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _amountController,
-                              decoration: _inputDecoration(label: 'Monto total', hint: _amountPlaceholder),
-                              keyboardType: _currency == 'CLP'
-                                  ? TextInputType.number
-                                  : const TextInputType.numberWithOptions(decimal: true),
-                              validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Monto inválido' : null,
-                              onChanged: (v) {
-                                final formatted = _formatAmountInput(v);
-                                if (v != formatted) {
-                                  _amountController.text = formatted;
-                                  _amountController.selection = TextSelection.fromPosition(TextPosition(offset: formatted.length));
-                                }
-                                if (_selectedPayer != null) {
-                                  setState(() {
-                                    _payerAmounts[_selectedPayer!] = double.tryParse(formatted) ?? 0.0;
-                                  });
-                                }
-                              },
-                            ),
+                          Text(
+                            widget.expenseToEdit != null ? 'Editando Gasto' : 'Nuevo Gasto',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
                           ),
-                          const SizedBox(width: 12),
-                          SizedBox(
-                            height: 56,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: _currency,
-                                  items: _currencies.map((c) => DropdownMenuItem<String>(
-                                    value: c['code'],
-                                    child: Row(
-                                      children: [
-                                        Text(c['icon'] ?? ''),
-                                        const SizedBox(width: 4),
-                                        Text(c['label'] ?? ''),
-                                      ],
-                                    ),
-                                  )).toList(),
-                                  onChanged: (v) => setState(() => _currency = v ?? 'CLP'),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
-                      // ¿Quién pagó? y Fecha en filas separadas
-                      _buildPayers(),
-                      const SizedBox(height: 28),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Agregar imagen', style: TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 8),
-                                GestureDetector(
-                                  onTap: () async {
-                                    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-                                    if (image != null) {
-                                      setState(() => _imagePath = image.path);
+                          const SizedBox(height: 16),
+                          _buildParticipantSelector(),
+                          const SizedBox(height: 28),
+                          // Monto y moneda alineados
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _amountController,
+                                  decoration: _inputDecoration(label: 'Monto total', hint: _amountPlaceholder),
+                                  keyboardType: _currency == 'CLP'
+                                      ? TextInputType.number
+                                      : const TextInputType.numberWithOptions(decimal: true),
+                                  validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Monto inválido' : null,
+                                  onChanged: (v) {
+                                    final formatted = _formatAmountInput(v);
+                                    if (v != formatted) {
+                                      _amountController.text = formatted;
+                                      _amountController.selection = TextSelection.fromPosition(TextPosition(offset: formatted.length));
+                                    }
+                                    if (_selectedPayer != null) {
+                                      setState(() {
+                                        _payerAmounts[_selectedPayer!] = double.tryParse(formatted) ?? 0.0;
+                                      });
                                     }
                                   },
-                                  child: Container(
-                                    width: 110,
-                                    height: 90,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: Colors.grey,
-                                        width: 1.2,
-                                        style: BorderStyle.solid,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.camera_alt, size: 32, color: Colors.grey),
-                                        const SizedBox(height: 6),
-                                        Text('Agregar', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                                      ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              SizedBox(
+                                height: 56,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[50],
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _currency,
+                                      items: _currencies.map((c) => DropdownMenuItem<String>(
+                                        value: c['code'],
+                                        child: Row(
+                                          children: [
+                                            Text(c['icon'] ?? ''),
+                                            const SizedBox(width: 4),
+                                            Text(c['label'] ?? ''),
+                                          ],
+                                        ),
+                                      )).toList(),
+                                      onChanged: (v) => setState(() => _currency = v ?? 'CLP'),
                                     ),
                                   ),
                                 ),
-                                if (_imagePath != null) ...[
-                                  const SizedBox(height: 8),
-                                  Text(_imagePath!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                ]
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
+                          const SizedBox(height: 28),
+                          // ¿Quién pagó? y Fecha en filas separadas
+                          _buildPayers(),
+                          const SizedBox(height: 28),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Agregar imagen', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: () async {
+                                        final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                                        if (image != null) {
+                                          setState(() => _imagePath = image.path);
+                                        }
+                                      },
+                                      child: Container(
+                                        width: 110,
+                                        height: 90,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[100],
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: Colors.grey,
+                                            width: 1.2,
+                                            style: BorderStyle.solid,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(Icons.camera_alt, size: 32, color: Colors.grey),
+                                            const SizedBox(height: 6),
+                                            Text('Agregar', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    if (_imagePath != null) ...[
+                                      const SizedBox(height: 8),
+                                      Text(_imagePath!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                    ]
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+                          TextFormField(
+                            controller: _descController,
+                            decoration: _inputDecoration(label: 'Descripción', hint: 'Ej: bebidas'),
+                            validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                          ),
+                          const SizedBox(height: 28),
+                          // Campo de categoría como dropdown
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: _selectedCategory,
+                                  items: [
+                                    ...kExpenseCategories.map((cat) => DropdownMenuItem<String>(
+                                      value: cat['key'],
+                                      child: Text(cat['label']),
+                                    )),
+                                  ],
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _selectedCategory = val;
+                                      if (val != 'otra') {
+                                        _categoryController.clear();
+                                      }
+                                    });
+                                  },
+                                  decoration: _inputDecoration(label: 'Categoría'),
+                                  validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                                ),
+                              ),
+                              if (_selectedCategory == 'otra')
+                                const SizedBox(width: 12),
+                              if (_selectedCategory == 'otra')
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _categoryController,
+                                    decoration: _inputDecoration(label: 'Otra categoría'),
+                                    validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+                          // Solo dejar la segunda sección de División
+                          _buildSplitInputs(),
+                          const SizedBox(height: 28),
+                          _buildSummary(),
+                          const SizedBox(height: 60),
                         ],
                       ),
-                      const SizedBox(height: 28),
-                      TextFormField(
-                        controller: _descController,
-                        decoration: _inputDecoration(label: 'Descripción', hint: 'Ej: bebidas'),
-                        validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
-                      ),
-                      const SizedBox(height: 28),
-                      // Campo de categoría como dropdown
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedCategory,
-                              items: [
-                                ...kExpenseCategories.map((cat) => DropdownMenuItem<String>(
-                                  value: cat['key'],
-                                  child: Text(cat['label']),
-                                )),
-                              ],
-                              onChanged: (val) {
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        color: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: _loading ? null : () {
+                                _submit();
+                                // Limpiar campos para agregar otro gasto
                                 setState(() {
-                                  _selectedCategory = val;
-                                  if (val != 'otra') {
-                                    _categoryController.clear();
-                                  }
+                                  _descController.clear();
+                                  _amountController.clear();
+                                  _customSplits.updateAll((key, value) => 0.0);
+                                  _payerAmounts.clear();
+                                  _selectedCategory = null;
+                                  _imagePath = null;
                                 });
                               },
-                              decoration: _inputDecoration(label: 'Categoría'),
-                              validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                              child: const Text('Guardar y agregar otro'),
                             ),
-                          ),
-                          if (_selectedCategory == 'otra')
-                            const SizedBox(width: 12),
-                          if (_selectedCategory == 'otra')
-                            Expanded(
-                              child: TextFormField(
-                                controller: _categoryController,
-                                decoration: _inputDecoration(label: 'Otra categoría'),
-                                validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              icon: Icon(widget.expenseToEdit != null ? Icons.save : Icons.add),
+                              label: Text(widget.expenseToEdit != null ? 'Guardar cambios' : 'Agregar gasto'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                               ),
+                              onPressed: _loading ? null : _submit,
                             ),
-                        ],
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 28),
-                      // Solo dejar la segunda sección de División
-                      _buildSplitInputs(),
-                      const SizedBox(height: 28),
-                      _buildSummary(),
-                      const SizedBox(height: 60),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    color: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: _loading ? null : () {
-                            _submit();
-                            // Limpiar campos para agregar otro gasto
-                            setState(() {
-                              _descController.clear();
-                              _amountController.clear();
-                              _customSplits.updateAll((key, value) => 0.0);
-                              _payerAmounts.clear();
-                              _selectedCategory = null;
-                              _imagePath = null;
-                            });
-                          },
-                          child: const Text('Guardar y agregar otro'),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton.icon(
-                          icon: Icon(widget.expenseToEdit != null ? Icons.save : Icons.add),
-                          label: Text(widget.expenseToEdit != null ? 'Guardar cambios' : 'Agregar gasto'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          ),
-                          onPressed: _loading ? null : _submit,
-                        ),
-                      ],
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
