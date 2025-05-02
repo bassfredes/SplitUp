@@ -1,6 +1,7 @@
 [
   {
     "origin": [
+      "http://localhost:*",
       "http://localhost",
       "http://127.0.0.1",
       "https://splitup-5972d.web.app",
