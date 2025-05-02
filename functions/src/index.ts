@@ -1,13 +1,8 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import { onDocumentWritten } from "firebase-functions/v2/firestore";
+import {onDocumentWritten} from "firebase-functions/v2/firestore";
 
 admin.initializeApp();
-const db = admin.firestore();
-
-// --- INICIO: Lógica adaptada de DebtCalculatorService ---
-// Debes incluir o importar tu lógica real aquí.
-// Esta es una versión simplificada como ejemplo.
 interface Expense {
   amount: number;
   currency: string;
@@ -17,18 +12,24 @@ interface Expense {
   customSplits?: { userId: string; amount: number }[];
 }
 
+/**
+ * Calculates the balances of each participant per currency in a group.
+ * @param {Array<Expense>} expenses - List of group expenses
+ * @param {Array<string>} participantIds - IDs of the participants
+ * @return {Object} Object with balances per user and currency
+ */
 function calculateGroupBalances(
   expenses: Expense[],
   participantIds: string[]
 ): { [userId: string]: { [currency: string]: number } } {
   const userBalances: { [userId: string]: { [currency: string]: number } } = {};
 
-  // Inicializar balances para todos los participantes
+  // Initialize balances for all participants
   for (const userId of participantIds) {
     userBalances[userId] = {};
   }
 
-  // Agrupar gastos por moneda
+  // Group expenses by currency
   const expensesByCurrency: { [currency: string]: Expense[] } = {};
   for (const expense of expenses) {
     if (!expensesByCurrency[expense.currency]) {
@@ -37,12 +38,15 @@ function calculateGroupBalances(
     expensesByCurrency[expense.currency].push(expense);
   }
 
-  // Calcular balances por cada moneda
+  // Calculate balances for each currency
   for (const currency in expensesByCurrency) {
+    if (!Object.prototype.hasOwnProperty.call(expensesByCurrency, currency)) {
+      continue;
+    }
     const currencyExpenses = expensesByCurrency[currency];
     const balancesInCurrency: { [userId: string]: number } = {};
 
-    // Inicializar balances para esta moneda
+    // Initialize balances for this currency
     for (const userId of participantIds) {
       balancesInCurrency[userId] = 0;
     }
@@ -53,7 +57,7 @@ function calculateGroupBalances(
       );
       if (validParticipants.length === 0) continue;
 
-      // Sumar lo que cada uno pagó
+      // Add what each participant paid
       for (const payer of expense.payers) {
         if (participantIds.includes(payer.userId)) {
           balancesInCurrency[payer.userId] =
@@ -61,90 +65,94 @@ function calculateGroupBalances(
         }
       }
 
-      // Restar lo que cada uno debe según el tipo de división
+      // Subtract what each participant owes based on split type
       let totalShares = 0;
       switch (expense.splitType) {
-        case "equal": {
+      case "equal": {
+        const share = expense.amount / validParticipants.length;
+        for (const userId of validParticipants) {
+          balancesInCurrency[userId] =
+              (balancesInCurrency[userId] || 0) - share;
+        }
+        break;
+      }
+      case "shares": {
+        totalShares = validParticipants.reduce(
+          (sum, id) =>
+            sum +
+              (expense.customSplits?.find((s) => s.userId === id)?.amount || 1),
+          0
+        );
+        if (totalShares > 0) {
+          for (const userId of validParticipants) {
+            const userShareCount =
+                expense.customSplits?.find((s) => s.userId === userId)
+                  ?.amount || 1;
+            const shareAmount =
+                (expense.amount * userShareCount) / totalShares;
+            balancesInCurrency[userId] =
+                (balancesInCurrency[userId] || 0) - shareAmount;
+          }
+        }
+        break;
+      }
+      case "percent":
+      case "custom":
+      default: {
+        // For 'percent' and 'custom', assume customSplits
+        // contains the final amounts
+        // (or percentages that must be converted to amounts here if necessary)
+        // This logic may need adjustment depending on your exact implementation
+        if (expense.customSplits) {
+          let totalSplitAmount = 0;
+          if (expense.splitType === "percent") {
+            totalSplitAmount = 100; // or validate that they sum to 100
+          } else {
+            // custom
+            totalSplitAmount = expense.amount;
+            // or validate that they sum to the total
+          }
+
+          for (const split of expense.customSplits) {
+            if (validParticipants.includes(split.userId)) {
+              let amountToSubtract = split.amount;
+              if (expense.splitType === "percent" && totalSplitAmount > 0) {
+                // Ensure the percentage calculation is correct
+                amountToSubtract = (expense.amount * split.amount) / 100;
+              }
+              // Validate that the sum of custom
+              // splits matches the total if 'custom'
+              balancesInCurrency[split.userId] =
+                  (balancesInCurrency[split.userId] || 0) - amountToSubtract;
+            }
+          }
+        } else {
+          // Fallback to equal split if there are no
+          // customSplits but the type requires it
           const share = expense.amount / validParticipants.length;
           for (const userId of validParticipants) {
             balancesInCurrency[userId] =
-              (balancesInCurrency[userId] || 0) - share;
-          }
-          break;
-        }
-        case "shares": {
-          totalShares = validParticipants.reduce(
-            (sum, id) =>
-              sum +
-              (expense.customSplits?.find((s) => s.userId === id)?.amount || 1),
-            0
-          );
-          if (totalShares > 0) {
-            for (const userId of validParticipants) {
-              const userShareCount =
-                expense.customSplits?.find((s) => s.userId === userId)
-                  ?.amount || 1;
-              const shareAmount =
-                (expense.amount * userShareCount) / totalShares;
-              balancesInCurrency[userId] =
-                (balancesInCurrency[userId] || 0) - shareAmount;
-            }
-          }
-          break;
-        }
-        case "percent":
-        case "custom": // Asume que customSplits tiene montos directos o porcentajes
-        default: {
-          // Para 'percent' y 'custom', asumimos que customSplits contiene los montos finales
-          // (o porcentajes que deben convertirse a montos aquí si es necesario)
-          // Esta lógica puede necesitar ajuste según tu implementación exacta
-          if (expense.customSplits) {
-            let totalSplitAmount = 0;
-            if (expense.splitType === "percent") {
-              totalSplitAmount = 100; // o validar que sumen 100
-            } else {
-              // custom
-              totalSplitAmount = expense.amount; // o validar que sumen el total
-            }
-
-            for (const split of expense.customSplits) {
-              if (validParticipants.includes(split.userId)) {
-                let amountToSubtract = split.amount;
-                if (expense.splitType === "percent" && totalSplitAmount > 0) {
-                  // Asegúrate que el cálculo de porcentaje sea correcto
-                  amountToSubtract = (expense.amount * split.amount) / 100;
-                }
-                // Validar que la suma de custom splits coincida con el total si es 'custom'
-                balancesInCurrency[split.userId] =
-                  (balancesInCurrency[split.userId] || 0) - amountToSubtract;
-              }
-            }
-          } else {
-            // Fallback a división igual si no hay customSplits pero el tipo lo requiere
-            const share = expense.amount / validParticipants.length;
-            for (const userId of validParticipants) {
-              balancesInCurrency[userId] =
                 (balancesInCurrency[userId] || 0) - share;
-            }
           }
-          break;
         }
+        break;
+      }
       }
     }
 
-    // Asignar balances calculados para esta moneda a la estructura final
+    // Assign calculated balances for this currency to the final structure
     for (const userId of participantIds) {
-      // Redondear a 2 decimales para evitar problemas de precisión flotante
+      // Round to 2 decimals to avoid floating point precision issues
       const finalBalance = parseFloat(balancesInCurrency[userId].toFixed(2));
       if (finalBalance !== 0) {
-        // Opcional: no guardar balances cero
+        // Optionally: do not store zero balances
         userBalances[userId][currency] = finalBalance;
       } else {
-        // Asegurarse de eliminar la moneda si el balance es cero
+        // Ensure the currency is removed if the balance is zero
         delete userBalances[userId][currency];
       }
     }
-    // Limpiar usuarios sin balances en ninguna moneda
+    // Remove users with no balances in any currency
     Object.keys(userBalances).forEach((userId) => {
       if (Object.keys(userBalances[userId]).length === 0) {
         delete userBalances[userId];
@@ -154,7 +162,6 @@ function calculateGroupBalances(
 
   return userBalances;
 }
-// --- FIN: Lógica adaptada de DebtCalculatorService ---
 
 export const onExpenseWrite = onDocumentWritten(
   "groups/{groupId}/expenses/{expenseId}",
@@ -166,13 +173,13 @@ export const onExpenseWrite = onDocumentWritten(
     functions.logger.info(`Recalculating balances for group: ${groupId}`);
 
     try {
-      // 1. Leer todos los gastos actuales del grupo
+      // 1. Read all current expenses for the group
       const expensesSnapshot = await groupRef.collection("expenses").get();
       const expensesData = expensesSnapshot.docs.map(
         (doc) => doc.data() as Expense
       );
 
-      // 2. Leer el documento del grupo para obtener participantes
+      // 2. Read the group document to get participants
       const groupDoc = await groupRef.get();
       if (!groupDoc.exists) {
         functions.logger.warn(`Group ${groupId} not found.`);
@@ -185,19 +192,24 @@ export const onExpenseWrite = onDocumentWritten(
         functions.logger.info(
           `Group ${groupId} has no participants. Clearing balances.`
         );
-        // Si no hay participantes, limpiar los balances
-        await groupRef.update({ participantBalances: {} });
+        // If there are no participants, clear the balances
+        await groupRef.update({participantBalances: {}});
         return;
       }
 
-      // 3. Calcular los balances
+      // 3. Calculate balances
       const calculatedBalances = calculateGroupBalances(
         expensesData,
         participantIds
       );
 
-      // 4. Actualizar el documento del grupo
-      await groupRef.update({ participantBalances: calculatedBalances });
+      // 4. Transform to app-compatible format (array of objects)
+      const participantBalancesArray = Object.entries(calculatedBalances).map(
+        ([userId, balances]) => ({userId, balances})
+      );
+
+      // 5. Update the group document
+      await groupRef.update({participantBalances: participantBalancesArray});
 
       functions.logger.info(
         `Successfully updated balances for group: ${groupId}`
