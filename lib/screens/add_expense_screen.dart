@@ -10,7 +10,6 @@ class AddExpenseScreen extends StatefulWidget {
   final String groupCurrency;
   final String? groupName;
 
-  // Corregido: Usar super parámetros
   const AddExpenseScreen({
     super.key,
     required this.groupId,

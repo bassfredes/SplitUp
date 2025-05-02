@@ -35,24 +35,24 @@ class GroupDetailScreen extends StatefulWidget {
 }
 
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
-  // Optimización: Future para cargar participantes una sola vez
+  // Optimization: Future to load participants only once
   Future<List<UserModel>>? _participantsFuture;
-  // Clave para forzar la reconstrucción del FutureBuilder de participantes si es necesario
+  // Key to force the reconstruction of the FutureBuilder of participants if necessary
   final GlobalKey _participantsFutureBuilderKey = GlobalKey();
 
-  // Variable para forzar recarga manual si es necesario (ej. después de invitar)
-  // int _participantsReload = 0; // Reemplazado por la actualización del Future
-  bool _participantsLoading = false; // Se mantiene para indicar carga durante acciones
+  // Variable to force manual reload if necessary (e.g. after inviting)
+  // int _participantsReload = 0; // Replaced by the Future update
+  bool _participantsLoading = false; // Remains to indicate loading during actions
 
   @override
   void initState() {
     super.initState();
-    // Cargar participantes al iniciar el estado
+    // Load participants when the state is initialized
     _loadParticipants();
   }
 
   void _loadParticipants() {
-    // Usar setState para que los FutureBuilders reaccionen al nuevo Future
+    // Use setState so that FutureBuilders react to the new Future
     setState(() {
       _participantsFuture = _fetchParticipantsByIds(widget.group.participantIds);
     });
@@ -60,9 +60,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<List<UserModel>> _fetchParticipantsByIds(List<String> userIds) async {
     if (userIds.isEmpty) return [];
-    // Optimización: Limitar el número de IDs en la consulta 'whereIn' si es muy grande
-    // Firestore tiene un límite (actualmente 30), pero es buena práctica considerarlo.
-    // Dividir en chunks si userIds.length > 30
+    // Optimization: Limit the number of IDs in the 'whereIn' query if it is too large
+    // Firestore has a limit (currently 30), but it is good practice to consider it.
+    // Split into chunks if userIds.length > 30
     List<UserModel> allUsers = [];
     List<List<String>> chunks = [];
     for (var i = 0; i < userIds.length; i += 30) {
@@ -78,7 +78,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       allUsers.addAll(usersSnap.docs.map((doc) => UserModel.fromMap(doc.data(), doc.id)));
     }
 
-    // Ordenar los usuarios según el orden original de userIds
+    // Sort users according to the original order of userIds
     allUsers.sort((a, b) => userIds.indexOf(a.id).compareTo(userIds.indexOf(b.id)));
     return allUsers;
   }
@@ -96,7 +96,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   }
 
   void _showExpenseDetail(BuildContext context, ExpenseModel expense, String groupName, Map<String, UserModel> usersById) async {
-    // No es necesario pre-cargar usuarios aquí si los pasamos
+    // No need to pre-load users here if we pass them
     // await FirebaseFirestore.instance
     //     .collection('users')
     //     .where(FieldPath.documentId, whereIn: expense.participantIds)
@@ -107,7 +107,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       '/group/${expense.groupId}/expense/${expense.id}',
       arguments: {
         'groupName': groupName,
-        'participantsMap': usersById, // Pasar el mapa de usuarios
+        'participantsMap': usersById, // Pass the user map
       },
     );
   }
@@ -117,7 +117,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Totales por moneda:', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text('Totals by currency:', style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         ...totalsByCurrency.entries.map((entry) => Text(
           '${formatCurrency(entry.value, entry.key)} ${entry.key}',
@@ -134,17 +134,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     if (result != null) {
       Map<String, dynamic> importResult;
       if (kIsWeb) {
-        // Web: leer desde bytes
+        // Web: read from bytes
         final bytes = result.files.single.bytes;
         if (bytes == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo leer el archivo CSV.')),
+            const SnackBar(content: Text('Could not read the CSV file.')),
           );
           return;
         }
-        // Decodificar a String (UTF-8)
+        // Decode to String (UTF-8)
         String content = utf8.decode(bytes);
-        // Quitar BOM si existe
+        // Remove BOM if it exists
         if (content.startsWith('\uFEFF')) content = content.substring(1);
         importResult = await ExportService().importExpensesFromCsvContentWithValidation(content, users, group.id);
       } else if (result.files.single.path != null) {
@@ -152,7 +152,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         importResult = await ExportService().importExpensesFromCsvWithValidation(file, users, group.id);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo leer el archivo CSV.')),
+          const SnackBar(content: Text('Could not read the CSV file.')),
         );
         return;
       }
@@ -162,19 +162,19 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         await showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Errores en la importación'),
+            title: const Text('Import errors'),
             content: SizedBox(
               width: 400,
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Se encontraron los siguientes errores:'),
+                    const Text('The following errors were found:'),
                     const SizedBox(height: 8),
                     ...errors.map((e) => Text(e, style: const TextStyle(color: Colors.red, fontSize: 13))),
                     const SizedBox(height: 16),
                     if (expenses.isNotEmpty)
-                      Text('Aún así, se pueden importar ${expenses.length} gastos válidos.'),
+                      Text('Still, you can import ${expenses.length} valid expenses.'),
                   ],
                 ),
               ),
@@ -186,11 +186,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     Navigator.pop(context);
                     await _saveImportedExpenses(expenses);
                   },
-                  child: const Text('Importar válidos'),
+                  child: const Text('Import valid'),
                 ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar'),
+                child: const Text('Cancel'),
               ),
             ],
           ),
@@ -199,16 +199,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         final confirm = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Confirmar importación'),
-            content: Text('¿Deseas importar ${expenses.length} gastos?'),
+            title: const Text('Confirm import'),
+            content: Text('Do you want to import ${expenses.length} expenses?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancelar'),
+                child: const Text('Cancel'),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Importar'),
+                child: const Text('Import'),
               ),
             ],
           ),
@@ -218,7 +218,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se importó ningún gasto válido.')),
+          const SnackBar(content: Text('No valid expense was imported.')),
         );
       }
     }
@@ -235,7 +235,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     await batch.commit();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Importación completada: ${expenses.length} gastos importados.')),
+      SnackBar(content: Text('Import completed: ${expenses.length} expenses imported.')),
     );
   }
 
@@ -252,13 +252,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     final groupRef = FirebaseFirestore.instance.collection('groups').doc(group.id);
     await showDialog(
       context: context,
-      barrierDismissible: false, // No se puede cerrar haciendo click fuera
+      barrierDismissible: false, // Cannot close by clicking outside
       builder: (context) {
-        // Este es el setState que debemos usar para el contenido del diálogo
+        // This is the setState we should use for the dialog content
         return StatefulBuilder(
           builder: (context, setStateDialog) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Editar grupo'),
+            title: const Text('Edit group'),
             content: SizedBox(
               width: 500,
               child: SingleChildScrollView(
@@ -276,11 +276,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               final ext = image.name.split('.').last.toLowerCase();
                               final bytes = await image.length();
                               if (!allowedExtensions.contains(ext)) {
-                                setStateDialog(() => uploadError = 'Solo se permiten imágenes JPG o PNG');
+                                setStateDialog(() => uploadError = 'Only JPG or PNG images are allowed');
                                 return;
                               }
                               if (bytes > 2 * 1024 * 1024) {
-                                setStateDialog(() => uploadError = 'La imagen no debe superar los 2MB');
+                                setStateDialog(() => uploadError = 'The image must not exceed 2MB');
                                 return;
                               }
                               setStateDialog(() {
@@ -336,24 +336,24 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Nombre del grupo'),
+                      decoration: const InputDecoration(labelText: 'Group name'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: descController,
-                      decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+                      decoration: const InputDecoration(labelText: 'Description (optional)'),
                     ),
                     const SizedBox(height: 16),
-                    const Text('Participantes', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Participants', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    // Ya no necesita FutureBuilder aquí, usa participantsMap
+                    // No longer needs FutureBuilder here, uses participantsMap
                     StatefulBuilder(
                       builder: (context, setStateDialog) {
-                        // Filtrar el mapa basado en los IDs actuales
+                        // Filter the map based on the current IDs
                         final currentDialogParticipants = participantIds
                             .map((id) => participantsMap[id])
                             .where((user) => user != null)
-                            .cast<UserModel>() // Asegurar el tipo
+                            .cast<UserModel>() // Ensure the type
                             .toList();
 
                         return Column(
@@ -367,7 +367,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 ? IconButton(
                                     icon: const Icon(Icons.remove_circle, color: Colors.red),
                                     onPressed: () {
-                                      // Actualizar la lista de IDs y el estado del diálogo
+                                      // Update the list of IDs and the dialog state
                                       setStateDialog(() => participantIds.remove(user.id));
                                     },
                                   )
@@ -379,23 +379,23 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     const SizedBox(height: 8),
                     ElevatedButton.icon(
                       icon: const Icon(Icons.person_add),
-                      label: const Text('Añadir participante'),
+                      label: const Text('Add participant'),
                       onPressed: () async {
                         final emailController = TextEditingController();
                         String? error;
-                        // Usamos un segundo StatefulBuilder para el diálogo interno de añadir email
-                        // para que su estado (error) no afecte al diálogo principal.
+                        // We use a second StatefulBuilder for the internal add email dialog
+                        // so that its state (error) does not affect the main dialog.
                         await showDialog(
                           context: context,
                           builder: (contextInner) => StatefulBuilder(
                             builder: (contextInner, setStateInner) => AlertDialog(
-                              title: const Text('Invitar participante'),
+                              title: const Text('Invite participant'),
                               content: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   TextField(
                                     controller: emailController,
-                                    decoration: const InputDecoration(labelText: 'Correo del participante'),
+                                    decoration: const InputDecoration(labelText: 'Participant email'),
                                   ),
                                   if (error != null)
                                     Padding(
@@ -407,7 +407,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(contextInner),
-                                  child: const Text('Cancelar'),
+                                  child: const Text('Cancel'),
                                 ),
                                 ElevatedButton(
                                   onPressed: () async {
@@ -418,23 +418,23 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                         .limit(1)
                                         .get();
                                     if (userSnap.docs.isEmpty) {
-                                      // Actualizar el estado del diálogo interno
-                                      setStateInner(() => error = 'Usuario no encontrado');
+                                      // Update the internal dialog state
+                                      setStateInner(() => error = 'User not found');
                                       return;
                                     }
                                     final userId = userSnap.docs.first.id;
                                     if (!participantIds.contains(userId)) {
-                                      // Actualizar la lista de IDs y el estado del diálogo PRINCIPAL
+                                      // Update the list of IDs and the MAIN dialog state
                                       setStateDialog(() => participantIds.add(userId));
-                                      // Opcionalmente, actualizar el mapa si el usuario no estaba
+                                      // Optionally, update the map if the user was not there
                                       if (!participantsMap.containsKey(userId)) {
                                         final newUser = UserModel.fromMap(userSnap.docs.first.data(), userId);
                                         setStateDialog(() => participantsMap[userId] = newUser);
                                       }
                                     }
-                                    Navigator.pop(contextInner); // Cerrar diálogo interno
+                                    Navigator.pop(contextInner); // Close internal dialog
                                   },
-                                  child: const Text('Invitar'),
+                                  child: const Text('Invite'),
                                 ),
                               ],
                             ),
@@ -457,7 +457,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar'),
+                child: const Text('Cancel'),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor, foregroundColor: Colors.white),
@@ -468,7 +468,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         if (imagePath != null) {
                           setStateDialog(() { uploading = true; uploadError = null; });
                           try {
-                            debugPrint('[DEBUG] Subiendo imagen: $imagePath');
+                            debugPrint('[DEBUG] Uploading image: $imagePath');
                             final ref = FirebaseStorage.instance.ref().child('group_photos/${DateTime.now().millisecondsSinceEpoch}.jpg');
                             if (kIsWeb) {
                               final bytes = await XFile(imagePath!).readAsBytes();
@@ -477,12 +477,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               await ref.putFile(File(imagePath!));
                             }
                             final url = await ref.getDownloadURL();
-                            debugPrint('[DEBUG] Imagen subida correctamente. URL: $url');
+                            debugPrint('[DEBUG] Image uploaded successfully. URL: $url');
                             newPhotoUrl = url;
                           } catch (e, st) {
-                            debugPrint('[ERROR] Error al subir imagen: $e');
+                            debugPrint('[ERROR] Error uploading image: $e');
                             debugPrint(st.toString());
-                            setStateDialog(() { uploading = false; uploadError = 'Error al subir la imagen'; });
+                            setStateDialog(() { uploading = false; uploadError = 'Error uploading image'; });
                             return;
                           }
                           setStateDialog(() { uploading = false; });
@@ -498,7 +498,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         setState(() {});
                         _loadParticipants();
                       },
-                child: const Text('Guardar'),
+                child: const Text('Save'),
               ),
             ],
           ),
@@ -552,14 +552,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   children: [
                     Breadcrumb(
                       items: [
-                        BreadcrumbItem('Inicio', route: '/dashboard'),
-                        BreadcrumbItem('Grupo: ${group.name}'),
+                        BreadcrumbItem('Home', route: '/dashboard'),
+                        BreadcrumbItem('Group: ${group.name}'),
                       ],
                       onTap: (i) {
                         if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
                       },
                     ),
-                    // --- FOTO DEL GRUPO Y BOTÓN EDITAR ---
+                    // --- GROUP PHOTO AND EDIT BUTTON ---
                     Row(
                       children: [
                         CircleAvatar(
@@ -591,7 +591,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                             final users = snapshot.data ?? [];
                             return IconButton(
                               icon: const Icon(Icons.edit, color: Colors.teal),
-                              tooltip: 'Editar grupo',
+                              tooltip: 'Edit group',
                               onPressed: () => _showEditGroupDialog(group, users),
                             );
                           },
@@ -603,30 +603,30 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       Text(group.description!, style: Theme.of(context).textTheme.bodyMedium),
                     ],
                     const SizedBox(height: 24),
-                    const Text('Participantes:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Participants:', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     FutureBuilder<List<UserModel>>(
-                      // Usar el Future del estado
+                      // Use the state's Future
                       future: _participantsFuture,
-                      // Usar una clave para permitir reconstrucción si _participantsFuture cambia
+                      // Use a key to allow reconstruction if _participantsFuture changes
                       key: _participantsFutureBuilderKey,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting || _participantsLoading) {
                           return const Center(child: CircularProgressIndicator());
                         }
                         if (snapshot.hasError) {
-                          debugPrint("Error cargando participantes: ${snapshot.error}");
-                          return const Text('Error al cargar participantes.', style: TextStyle(color: Colors.red));
+                          debugPrint("Error loading participants: ${snapshot.error}");
+                          return const Text('Error loading participants.', style: TextStyle(color: Colors.red));
                         }
                         final users = snapshot.data ?? [];
                         if (users.isEmpty) {
-                          return const Text('Sin participantes');
+                          return const Text('No participants');
                         }
-                        // Guardar los participantes para usarlos en otros lugares si es necesario
+                        // Save participants to use them elsewhere if necessary
                         // final List<UserModel> currentParticipants = users;
                         return Wrap(
                           spacing: 8,
-                          runSpacing: 4, // Añadir espacio vertical
+                          runSpacing: 4, // Add vertical space
                           children: users.map((user) => Chip(
                             avatar: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
                                 ? CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!))
@@ -639,17 +639,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 final confirm = await showDialog<bool>(
                                   context: context,
                                   builder: (context) => AlertDialog(
-                                    title: const Text('Eliminar participante'),
-                                    content: Text('¿Estás seguro de que deseas eliminar a ${user.name}?'),
+                                    title: const Text('Remove participant'),
+                                    content: Text('Are you sure you want to remove ${user.name}?'),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('Cancelar'),
+                                        child: const Text('Cancel'),
                                       ),
                                       ElevatedButton(
                                         style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                                         onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('Eliminar'),
+                                        child: const Text('Remove'),
                                       ),
                                     ],
                                   ),
@@ -675,40 +675,40 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       },
                     ),
                     const SizedBox(height: 32),
-                    // --- BOTÓN AGREGAR GASTO (ARRIBA DEL LISTADO) ---
+                    // --- ADD EXPENSE BUTTON (ABOVE THE LIST) ---
                     Align(
                       alignment: Alignment.centerRight,
                       child: FutureBuilder<List<UserModel>>(
-                        // Usar el Future del estado
+                        // Use the state's Future
                         future: _participantsFuture,
                         builder: (context, snapshot) {
-                          // No mostrar botón mientras carga o si hay error
+                          // Do not show button while loading or if there is an error
                           if (snapshot.connectionState != ConnectionState.done || snapshot.hasError || !snapshot.hasData) {
                              return ElevatedButton.icon(
                                 icon: const Icon(Icons.add),
-                                label: const Text('Agregar gasto'),
+                                label: const Text('Add expense'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey, // Deshabilitado visualmente
+                                  backgroundColor: Colors.grey, // Visually disabled
                                   foregroundColor: Colors.white,
                                 ),
-                                onPressed: null, // Deshabilitado
+                                onPressed: null, // Disabled
                               );
                           }
                           final users = snapshot.data!;
                           return ElevatedButton.icon(
                             icon: const Icon(Icons.add),
-                            label: const Text('Agregar gasto'),
+                            label: const Text('Add expense'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: kPrimaryColor,
                               foregroundColor: Colors.white,
                             ),
                             onPressed: () async {
-                              // Ya tenemos los usuarios de snapshot.data
+                              // We already have the users from snapshot.data
                               if (users.isEmpty) {
                                 final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
                                 if (scaffoldMessenger != null) {
                                   scaffoldMessenger.showSnackBar(
-                                    const SnackBar(content: Text('No se pueden cargar los participantes del grupo.')),
+                                    const SnackBar(content: Text('Could not load group participants.')),
                                   );
                                 }
                                 return;
@@ -731,17 +731,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // --- LISTA DE GASTOS AGRUPADOS POR FECHA CON PAGINACIÓN ---
+                    // --- LIST OF EXPENSES GROUPED BY DATE WITH PAGINATION ---
                     FutureBuilder<List<UserModel>>(
-                      // Usar el Future del estado
+                      // Use the state's Future
                       future: _participantsFuture,
                       builder: (context, userSnapshot) {
                         if (userSnapshot.connectionState == ConnectionState.waiting) {
                           return const Center(child: CircularProgressIndicator());
                         }
                          if (userSnapshot.hasError) {
-                          debugPrint("Error cargando participantes para lista de gastos: ${userSnapshot.error}");
-                          return const Text('Error al cargar datos de usuarios.', style: TextStyle(color: Colors.red));
+                          debugPrint("Error loading participants for expense list: ${userSnapshot.error}");
+                          return const Text('Error loading user data.', style: TextStyle(color: Colors.red));
                         }
                         final users = userSnapshot.data ?? [];
                         final usersById = {for (var u in users) u.id: u};
@@ -754,9 +754,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                             }
                             final expenses = snapshot.data ?? [];
                             if (expenses.isEmpty) {
-                              return const Text('No hay gastos registrados.');
+                              return const Text('No expenses recorded.');
                             }
-                            // PAGINACIÓN
+                            // PAGINATION
                             const int pageSize = 30;
                             final pageCount = (expenses.length / pageSize).ceil();
                             int currentPage = 0;
@@ -770,7 +770,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 final start = currentPage * pageSize;
                                 final end = (start + pageSize > expenses.length) ? expenses.length : start + pageSize;
                                 final pageExpenses = expenses.sublist(start, end);
-                                // Agrupar por fecha (yyyy-MM-dd)
+                                // Group by date (yyyy-MM-dd)
                                 final Map<String, List<ExpenseModel>> grouped = {};
                                 for (final e in pageExpenses) {
                                   final key = e.date.toLocal().toString().split(' ')[0];
@@ -794,7 +794,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                               expense: e,
                                               usersById: usersById,
                                               currentUserId: currentUserId,
-                                              // Pasar groupName y usersById al onTap
+                                              // Pass groupName and usersById to onTap
                                               onTap: () => _showExpenseDetail(context, e, widget.group.name, usersById),
                                             )),
                                       ],
@@ -833,21 +833,21 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       },
                     ),
                     const SizedBox(height: 32),
-                    // --- RESUMEN DE SALDOS Y SIMPLIFICACIÓN DE DEUDAS (con nombres) ---
+                    // --- BALANCE SUMMARY AND DEBT SIMPLIFICATION (with names) ---
                     FutureBuilder<List<UserModel>>(
-                      // Usar el Future del estado
+                      // Use the state's Future
                       future: _participantsFuture,
                       builder: (context, userSnapshot) {
                         if (userSnapshot.connectionState == ConnectionState.waiting) {
                           return const Center(child: CircularProgressIndicator());
                         }
                          if (userSnapshot.hasError) {
-                          debugPrint("Error cargando participantes para saldos: ${userSnapshot.error}");
-                          return const Text('Error al cargar datos de usuarios para saldos.', style: TextStyle(color: Colors.red));
+                          debugPrint("Error loading participants for balances: ${userSnapshot.error}");
+                          return const Text('Error loading user data for balances.', style: TextStyle(color: Colors.red));
                         }
                         final users = userSnapshot.data ?? [];
                         final idToName = {for (var u in users) u.id: u.name};
-                        // Obtener ID del usuario actual aquí para usarlo en el map
+                        // Get the current user's ID here to use it in the map
                         final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?.id ?? '';
 
                         return StreamBuilder<List<ExpenseModel>>(
@@ -858,14 +858,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                             }
                             final expenses = snapshot.data ?? [];
                             if (expenses.isEmpty) {
-                              return const Text('No hay gastos para calcular saldos.');
+                              return const Text('No expenses to calculate balances.');
                             }
-                            // --- RESUMEN DE TOTALES POR MONEDA ---
+                            // --- TOTALS BY CURRENCY SUMMARY ---
                             final Map<String, double> totalsByCurrency = {};
                             for (final e in expenses) {
                               totalsByCurrency[e.currency] = (totalsByCurrency[e.currency] ?? 0) + e.amount;
                             }
-                            // --- RESUMEN DE SALDOS Y DEUDAS POR MONEDA ---
+                            // --- BALANCE AND DEBT SUMMARY BY CURRENCY ---
                             final Map<String, List<ExpenseModel>> expensesByCurrency = {};
                             for (final e in expenses) {
                               expensesByCurrency.putIfAbsent(e.currency, () => []).add(e);
@@ -882,38 +882,38 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                   return Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Resumen de saldos ($currency):', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      Text('Balance summary ($currency):', style: const TextStyle(fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 8),
-                                      // --- Modificación aquí para resaltar usuario actual --- 
+                                      // --- Modification here to highlight current user --- 
                                       ...balances.entries.map((e) {
-                                        final bool isCurrentUser = e.key == currentUserId; // Comprobar si es el usuario actual
+                                        final bool isCurrentUser = e.key == currentUserId; // Check if it is the current user
                                         final userName = idToName[e.key] ?? e.key;
                                         final balanceText = '${e.value >= 0 ? "+" : "-"}${formatCurrency(e.value.abs(), currency)}';
                                         final textColor = e.value > 0 ? Colors.green : (e.value < 0 ? Colors.red : Colors.black);
 
-                                        return Container( // Envolver en Container para posible fondo
-                                          color: isCurrentUser ? const Color.fromRGBO(0, 128, 128, 0.1) : null, // Fondo sutil si es el usuario actual
+                                        return Container( // Wrap in Container for possible background
+                                          color: isCurrentUser ? const Color.fromRGBO(0, 128, 128, 0.1) : null, // Subtle background if it is the current user
                                           padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
                                           child: Text(
-                                            '${isCurrentUser ? '$userName (Tú)' : userName}: $balanceText',
+                                            '${isCurrentUser ? '$userName (You)' : userName}: $balanceText',
                                             style: TextStyle(
                                               color: textColor,
-                                              // Aplicar negrita si es el usuario actual
+                                              // Apply bold if it is the current user
                                               fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal,
                                             ),
                                           ),
                                         );
                                       }),
-                                      // --- Fin Modificación ---
+                                      // --- End Modification ---
                                       const SizedBox(height: 8),
-                                      Text('Quién le debe a quién ($currency):', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      Text('Who owes whom ($currency):', style: const TextStyle(fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 8),
                                       if (transactions.isEmpty)
-                                        const Text('No hay deudas pendientes.')
+                                        const Text('No pending debts.')
                                       else
                                         ...transactions.map((t) => Text(
-                                          '${idToName[t['from']] ?? t['from']} le debe '
-                                          '${formatCurrency(t['amount'], currency)} a '
+                                          '${idToName[t['from']] ?? t['from']} owes '
+                                          '${formatCurrency(t['amount'], currency)} to '
                                           '${idToName[t['to']] ?? t['to']}',
                                           style: const TextStyle(color: Colors.blueGrey),
                                         )),
@@ -928,13 +928,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       },
                     ),
                     const SizedBox(height: 32),
-                    // --- SECCIÓN DE ACCIONES DE GRUPO ---
+                    // --- GROUP ACTIONS SECTION ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton.icon(
                           icon: const Icon(Icons.person_add),
-                          label: const Text('Invitar'),
+                          label: const Text('Invite'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kPrimaryColor,
                             foregroundColor: Colors.white,
@@ -948,7 +948,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                             if (!mounted) return;
                             setState(() => _participantsLoading = false);
                             if (result == true) {
-                              _loadParticipants(); // Recargar la lista de participantes
+                              _loadParticipants(); // Reload the participant list
                             }
                           },
                         ),
@@ -957,13 +957,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     const SizedBox(height: 32),
                     Divider(height: 1, thickness: 1, color: const Color(0xFFE0E0E0)),
                     const SizedBox(height: 24),
-                    // --- SECCIÓN DE EXPORTAR/IMPORTAR ---
+                    // --- EXPORT/IMPORT SECTION ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton.icon(
                           icon: const Icon(Icons.file_download),
-                          label: const Text('Exportar CSV'),
+                          label: const Text('Export CSV'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
@@ -972,7 +972,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                             final users = await _participantsFuture;
                             if (users == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Esperando datos de participantes...')),
+                                const SnackBar(content: Text('Waiting for participant data...')),
                               );
                               return;
                             }
@@ -984,7 +984,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                             final expenses = expensesSnap.docs.map((doc) => ExpenseModel.fromMap(doc.data(), doc.id)).toList();
                             final rows = [
                               [
-                                'Descripción', 'Monto', 'Moneda', 'Fecha', 'Pagadores (email:monto)', 'Participantes (emails)', 'Categoría', 'Recurrente', 'Bloqueado'
+                                'Description', 'Amount', 'Currency', 'Date', 'Payers (email:amount)', 'Participants (emails)', 'Category', 'Recurring', 'Locked'
                               ],
                               ...expenses.map((e) => [
                                 e.description,
@@ -993,35 +993,35 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 e.date.toIso8601String(),
                                 e.payers.map((p) {
                                   final email = users.firstWhere((u) => u.id == p['userId'], orElse: () => UserModel(id: '', name: '', email: p['userId'], photoUrl: null)).email;
-                                  final monto = (p['amount'] is double) ? (p['amount'] as double).toInt() : p['amount'];
-                                  return '$email:$monto';
+                                  final amount = (p['amount'] is double) ? (p['amount'] as double).toInt() : p['amount'];
+                                  return '$email:$amount';
                                 }).join(';'),
                                 e.participantIds.map((id) => users.firstWhere((u) => u.id == id, orElse: () => UserModel(id: '', name: '', email: id, photoUrl: null)).email).join(';'),
                                 e.category ?? '',
-                                e.isRecurring ? 'Sí' : 'No',
-                                e.isLocked ? 'Sí' : 'No',
+                                e.isRecurring ? 'Yes' : 'No',
+                                e.isLocked ? 'Yes' : 'No',
                               ])
                             ];
                             final csv = const ListToCsvConverter().convert(rows);
                             final bom = '\uFEFF';
                             if (kIsWeb) {
-                              // Web: descargar usando dart:html
+                              // Web: download using dart:html
                               final bytes = utf8.encode(bom + csv);
                               final blob = html.Blob([bytes], 'text/csv');
                               final url = html.Url.createObjectUrlFromBlob(blob);
                               html.AnchorElement(href: url)
-                                ..download = 'gastos_${group.name}_${DateTime.now().millisecondsSinceEpoch}.csv'
+                                ..download = 'expenses_${group.name}_${DateTime.now().millisecondsSinceEpoch}.csv'
                                 ..click();
                               html.Url.revokeObjectUrl(url);
                             } else {
-                              // Desktop/móvil: guardar en disco
+                              // Desktop/mobile: save to disk
                               final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-                              final filePath = '${dir.path}/gastos_${group.name}_${DateTime.now().millisecondsSinceEpoch}.csv';
+                              final filePath = '${dir.path}/expenses_${group.name}_${DateTime.now().millisecondsSinceEpoch}.csv';
                               final file = File(filePath);
                               await file.writeAsString(bom + csv, encoding: utf8);
                               if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Archivo exportado: $filePath')),
+                                SnackBar(content: Text('File exported: $filePath')),
                               );
                             }
                           },
@@ -1029,7 +1029,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.file_upload),
-                          label: const Text('Importar CSV'),
+                          label: const Text('Import CSV'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
@@ -1038,7 +1038,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                             final users = await _participantsFuture;
                             if (users == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Esperando datos de participantes...')),
+                                const SnackBar(content: Text('Waiting for participant data...')),
                               );
                               return;
                             }
@@ -1053,7 +1053,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.download, size: 18, color: Colors.blue),
                         label: const Text(
-                          'Descargar ejemplo CSV',
+                          'Download example CSV',
                           style: TextStyle(
                             color: Colors.blue,
                             fontSize: 13,
@@ -1072,16 +1072,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         onPressed: () async {
                           final rows = [
                             [
-                              'Descripci\u00f3n', 'Monto', 'Moneda', 'Fecha', 'Pagadores (email:monto)', 'Participantes (emails)', 'Categor\u00eda', 'Recurrente', 'Bloqueado'
+                              'Description', 'Amount', 'Currency', 'Date', 'Payers (email:amount)', 'Participants (emails)', 'Category', 'Recurring', 'Locked'
                             ],
                             [
-                              'Ejemplo de gasto',
+                              'Example expense',
                               '10000',
                               'CLP',
                               '2025-04-27',
-                              'usuario1@ejemplo.com:10000',
-                              'usuario1@ejemplo.com;usuario2@ejemplo.com',
-                              'Comida',
+                              'user1@example.com:10000',
+                              'user1@example.com;user2@example.com',
+                              'Food',
                               'No',
                               'No'
                             ]
@@ -1093,17 +1093,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                             final blob = html.Blob([Uint8List.fromList(bytes)], 'text/csv');
                             final url = html.Url.createObjectUrlFromBlob(blob);
                             html.AnchorElement(href: url)
-                              ..download = 'gastos_ejemplo_importacion.csv'
+                              ..download = 'expenses_example_import.csv'
                               ..click();
                             html.Url.revokeObjectUrl(url);
                           } else {
                             final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-                            final filePath = '${dir.path}/gastos_ejemplo_importacion.csv';
-                            // Usar emails dummy en el archivo de ejemplo
+                            final filePath = '${dir.path}/expenses_example_import.csv';
+                            // Use dummy emails in the example file
                             await File(filePath).writeAsString('\uFEFF$csv', encoding: utf8);
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Archivo de ejemplo guardado en: $filePath')),
+                              SnackBar(content: Text('Example file saved at: $filePath')),
                             );
                           }
                         },
@@ -1116,7 +1116,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       child: Column(
                         children: [
                           const Text(
-                            '¡Cuidado! Esta acción es irreversible.',
+                            'Warning! This action is irreversible.',
                             style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15),
                             textAlign: TextAlign.center,
                           ),
@@ -1134,7 +1134,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               if (isAdmin || isOnlyParticipant || !Navigator.canPop(context)) {
                                 return ElevatedButton.icon(
                                   icon: const Icon(Icons.delete),
-                                  label: const Text('Eliminar grupo'),
+                                  label: const Text('Delete group'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red,
                                     foregroundColor: Colors.white,
@@ -1147,17 +1147,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                     final confirm = await showDialog<bool>(
                                       context: context,
                                       builder: (context) => AlertDialog(
-                                        title: const Text('Eliminar grupo'),
-                                        content: const Text('¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.'),
+                                        title: const Text('Delete group'),
+                                        content: const Text('Are you sure you want to delete this group? This action cannot be undone.'),
                                         actions: [
                                           TextButton(
                                             onPressed: () => Navigator.pop(context, false),
-                                            child: const Text('Cancelar'),
+                                            child: const Text('Cancel'),
                                           ),
                                           ElevatedButton(
                                             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                                             onPressed: () => Navigator.pop(context, true),
-                                            child: const Text('Eliminar'),
+                                            child: const Text('Delete'),
                                           ),
                                         ],
                                       ),
@@ -1171,7 +1171,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               } else if (user != null && group.participantIds.contains(user.id)) {
                                 return ElevatedButton.icon(
                                   icon: const Icon(Icons.exit_to_app),
-                                  label: const Text('Abandonar grupo'),
+                                  label: const Text('Leave group'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.orange,
                                     foregroundColor: Colors.white,
@@ -1184,17 +1184,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                     final confirm = await showDialog<bool>(
                                       context: context,
                                       builder: (context) => AlertDialog(
-                                        title: const Text('Abandonar grupo'),
-                                        content: const Text('¿Seguro que quieres abandonar este grupo?'),
+                                        title: const Text('Leave group'),
+                                        content: const Text('Are you sure you want to leave this group?'),
                                         actions: [
                                           TextButton(
                                             onPressed: () => Navigator.pop(context, false),
-                                            child: const Text('Cancelar'),
+                                            child: const Text('Cancel'),
                                           ),
                                           ElevatedButton(
                                             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
                                             onPressed: () => Navigator.pop(context, true),
-                                            child: const Text('Abandonar'),
+                                            child: const Text('Leave'),
                                           ),
                                         ],
                                       ),
@@ -1242,7 +1242,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               alignment: Alignment.center,
               decoration: isActive
                   ? BoxDecoration(
-                      color: kPrimaryColor, // color primario del proyecto
+                      color: kPrimaryColor, // primary color of the project
                       shape: BoxShape.circle,
                     )
                   : null,
@@ -1314,15 +1314,15 @@ class _InviteParticipantDialogState extends State<_InviteParticipantDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Invitar participante'),
+      title: const Text('Invite participant'),
       content: _loading
           ? const Center(child: CircularProgressIndicator())
           : Form(
               key: _formKey,
               child: TextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Correo del participante'),
-                validator: (v) => v != null && v.contains('@') ? null : 'Correo inválido',
+                decoration: const InputDecoration(labelText: 'Participant email'),
+                validator: (v) => v != null && v.contains('@') ? null : 'Invalid email',
               ),
             ),
       actions: [
@@ -1333,7 +1333,7 @@ class _InviteParticipantDialogState extends State<_InviteParticipantDialog> {
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -1348,7 +1348,7 @@ class _InviteParticipantDialogState extends State<_InviteParticipantDialog> {
                   final email = _emailController.text.trim();
                   final currentUid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
                   try {
-                    // Buscar usuario por email
+                    // Search user by email
                     final userSnap = await FirebaseFirestore.instance
                         .collection('users')
                         .where('email', isEqualTo: email)
@@ -1358,45 +1358,45 @@ class _InviteParticipantDialogState extends State<_InviteParticipantDialog> {
                       if (!mounted) return;
                       setState(() {
                         _loading = false;
-                        _error = 'Usuario no encontrado';
+                        _error = 'User not found';
                       });
                       return;
                     }
                     final userId = userSnap.docs.first.id;
-                    // Obtener documento actual del grupo
+                    // Get current group document
                     final groupRef = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
                     final groupDoc = await groupRef.get();
                     if (!groupDoc.exists) {
                       setState(() {
                         _loading = false;
-                        _error = 'El grupo no existe';
+                        _error = 'Group does not exist';
                       });
                       return;
                     }
                     final data = groupDoc.data();
                     final List participantIds = List.from(data?['participantIds'] ?? []);
-                    // Validar permisos antes del update
+                    // Validate permissions before the update
                     if (currentUid == null) {
                       setState(() {
                         _loading = false;
-                        _error = 'No autenticado';
+                        _error = 'Not authenticated';
                       });
                       return;
                     }
                     if (!participantIds.contains(currentUid)) {
                       setState(() {
                         _loading = false;
-                        _error = 'No tienes permisos para invitar en este grupo';
+                        _error = 'You do not have permission to invite in this group';
                       });
                       return;
                     }
-                    // Agregar el nuevo usuario si no está
+                    // Add the new user if not already there
                     if (!participantIds.contains(userId)) {
                       participantIds.add(userId);
                     }
                     await groupRef.update({
                       'participantIds': participantIds,
-                      'roles': FieldValue.arrayUnion([{ 'uid': userId, 'role': 'miembro' }]),
+                      'roles': FieldValue.arrayUnion([{ 'uid': userId, 'role': 'member' }]),
                     });
                     if (!mounted) return;
                     setState(() => _loading = false);
@@ -1409,7 +1409,7 @@ class _InviteParticipantDialogState extends State<_InviteParticipantDialog> {
                     });
                   }
                 },
-          child: const Text('Invitar'),
+          child: const Text('Invite'),
         ),
       ],
     );

@@ -168,58 +168,72 @@ export const onExpenseWrite = onDocumentWritten(
   async (event) => {
     const groupId = event.params.groupId;
     const db = admin.firestore();
-    const groupRef = db.collection("groups").doc(groupId);
-
-    functions.logger.info(`Recalculating balances for group: ${groupId}`);
-
-    try {
-      // 1. Read all current expenses for the group
-      const expensesSnapshot = await groupRef.collection("expenses").get();
-      const expensesData = expensesSnapshot.docs.map(
-        (doc) => doc.data() as Expense
-      );
-
-      // 2. Read the group document to get participants
-      const groupDoc = await groupRef.get();
-      if (!groupDoc.exists) {
-        functions.logger.warn(`Group ${groupId} not found.`);
-        return;
-      }
-      const groupData = groupDoc.data();
-      const participantIds = (groupData?.participantIds as string[]) || [];
-
-      if (participantIds.length === 0) {
-        functions.logger.info(
-          `Group ${groupId} has no participants. Clearing balances.`
-        );
-        // If there are no participants, clear the balances
-        await groupRef.update({participantBalances: {}});
-        return;
-      }
-
-      // 3. Calculate balances
-      const calculatedBalances = calculateGroupBalances(
-        expensesData,
-        participantIds
-      );
-
-      // 4. Transform to app-compatible format (array of objects)
-      const participantBalancesArray = Object.entries(calculatedBalances).map(
-        ([userId, balances]) => ({userId, balances})
-      );
-
-      // 5. Update the group document
-      await groupRef.update({participantBalances: participantBalancesArray});
-
-      functions.logger.info(
-        `Successfully updated balances for group: ${groupId}`
-      );
-    } catch (error) {
-      functions.logger.error(
-        `Error recalculating balances for group ${groupId}:`,
-        error
-      );
-      return;
-    }
+    // Instead of recalculating here, mark the group as pending
+    await db.collection("pendingBalanceRecalc").doc(groupId).set({
+      groupId,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    // Do not recalculate balances here
+    return;
   }
 );
+
+// Scheduled function every minute to process pending groups
+export const processPendingBalanceRecalcs = functions.pubsub
+  .schedule("every 1 minutes")
+  .onRun(async (context) => {
+    const db = admin.firestore();
+    const pendingSnap = await db.collection("pendingBalanceRecalc").get();
+    for (const doc of pendingSnap.docs) {
+      const groupId = doc.id;
+      const groupRef = db.collection("groups").doc(groupId);
+      functions.logger.info(`Processing balance recalculation for group: ${groupId}`);
+      try {
+        // 1. Read all current expenses of the group
+        const expensesSnapshot = await groupRef.collection("expenses").get();
+        const expensesData = expensesSnapshot.docs.map(
+          (doc) => doc.data() as Expense
+        );
+        // 2. Read the group document to get participants
+        const groupDoc = await groupRef.get();
+        if (!groupDoc.exists) {
+          functions.logger.warn(`Group ${groupId} not found.`);
+          await doc.ref.delete();
+          continue;
+        }
+        const groupData = groupDoc.data();
+        const participantIds = (groupData?.participantIds as string[]) || [];
+        if (participantIds.length === 0) {
+          functions.logger.info(
+            `Group ${groupId} has no participants. Cleaning balances.`
+          );
+          await groupRef.update({ participantBalances: {} });
+          await doc.ref.delete();
+          continue;
+        }
+        // 3. Calculate balances
+        const calculatedBalances = calculateGroupBalances(
+          expensesData,
+          participantIds
+        );
+        // 4. Transform to app-compatible format
+        const participantBalancesArray = Object.entries(calculatedBalances).map(
+          ([userId, balances]) => ({ userId, balances })
+        );
+        // 5. Update the group document
+        await groupRef.update({ participantBalances: participantBalancesArray });
+        // 6. Remove the pending mark
+        await doc.ref.delete();
+        functions.logger.info(
+          `Balances updated for group: ${groupId}`
+        );
+      } catch (error) {
+        functions.logger.error(
+          `Error recalculating balances for group ${groupId}:`,
+          error
+        );
+        // Do not remove the mark, it will be retried in the next cycle
+      }
+    }
+    return null;
+  });

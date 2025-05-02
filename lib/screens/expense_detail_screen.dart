@@ -17,38 +17,38 @@ class ExpenseDetailScreen extends StatefulWidget {
 
 class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
   ExpenseModel? expense;
-  // Optimización: Recibir mapa de participantes en lugar de lista
+  // Optimization: Receive map of participants instead of list
   Map<String, UserModel> participantsMap = {};
   bool loading = true;
   String? error;
-  // Optimización: Recibir nombre del grupo
+  // Optimization: Receive group name
   String? groupName;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Leer argumentos aquí porque dependen del context
+    // Read arguments here because they depend on the context
     final arguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (arguments != null) {
       groupName = arguments['groupName'] as String?;
       participantsMap = arguments['participantsMap'] as Map<String, UserModel>? ?? {};
     }
-    // Cargar solo el gasto si no se ha hecho ya
+    // Load only the expense if it hasn't been done already
     if (loading && expense == null) {
        _loadExpense();
     }
   }
 
-  // Optimización: Renombrar y simplificar la función
+  // Optimization: Rename and simplify the function
   Future<void> _loadExpense() async {
-    // Asegurarse de no volver a cargar si ya está cargando o cargado
+    // Ensure not to reload if already loading or loaded
     if (!loading && expense != null) return;
     setState(() {
       loading = true;
       error = null;
     });
     try {
-      // Ya no se necesita buscar el grupo
+      // No need to fetch the group anymore
       // final groupDoc = await FirebaseFirestore.instance.collection('groups').doc(widget.groupId).get();
       // groupName = groupDoc.exists ? groupDoc.data()!["name"] as String? : null;
 
@@ -61,7 +61,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
 
       if (!doc.exists) {
         setState(() {
-          error = 'Gasto no encontrado';
+          error = 'Expense not found';
           loading = false;
         });
         return;
@@ -69,18 +69,18 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
 
       final exp = ExpenseModel.fromMap(doc.data()!, doc.id);
 
-      // Ya no se necesita buscar participantes, usar el mapa pasado
+      // No need to fetch participants, use the passed map
       // final usersSnap = await FirebaseFirestore.instance
       //     .collection('users')
       //     .where(FieldPath.documentId, whereIn: exp.participantIds)
       //     .get();
       // participants = usersSnap.docs.map((d) => UserModel.fromMap(d.data(), d.id)).toList();
 
-      // Validar que los participantes del gasto estén en el mapa (deberían)
+      // Validate that the expense participants are in the passed map (they should be)
       final missingParticipants = exp.participantIds.where((id) => !participantsMap.containsKey(id)).toList();
       if (missingParticipants.isNotEmpty) {
-        debugPrint("[WARN] ExpenseDetailScreen: Faltan participantes en el mapa pasado: $missingParticipants");
-        // Opcional: Podrías intentar cargarlos aquí como fallback, pero idealmente no debería pasar.
+        debugPrint("[WARN] ExpenseDetailScreen: Missing participants in the passed map: $missingParticipants");
+        // Optional: You could try to load them here as a fallback, but ideally this shouldn't happen.
       }
 
       setState(() {
@@ -90,15 +90,15 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
     } catch (e, stacktrace) {
       debugPrint("Error loading expense: $e\n$stacktrace");
       setState(() {
-        error = 'Error al cargar el gasto';
+        error = 'Error loading expense';
         loading = false;
       });
     }
   }
 
-  // Optimización: Usar el mapa de participantes
+  // Optimization: Use the participants map
   String _getUserName(String id) {
-    return participantsMap[id]?.name ?? 'Usuario desconocido';
+    return participantsMap[id]?.name ?? 'Unknown user';
   }
 
   @override
@@ -124,7 +124,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                 : expense == null
                     ? const Padding(
                         padding: EdgeInsets.all(32),
-                        child: Text('No se encontró el gasto.'),
+                        child: Text('Expense not found.'),
                       )
                     : Center(
                         child: Container(
@@ -148,10 +148,10 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                             children: [
                               Breadcrumb(
                                 items: [
-                                  BreadcrumbItem('Inicio', route: '/dashboard'),
-                                  // Usar el groupName recibido
-                                  BreadcrumbItem(groupName != null ? 'Grupo: $groupName' : 'Grupo', route: '/group/${widget.groupId}'),
-                                  BreadcrumbItem(expense != null ? expense!.description : 'Gasto'),
+                                  BreadcrumbItem('Home', route: '/dashboard'),
+                                  // Use the received groupName
+                                  BreadcrumbItem(groupName != null ? 'Group: $groupName' : 'Group', route: '/group/${widget.groupId}'),
+                                  BreadcrumbItem(expense != null ? expense!.description : 'Expense'),
                                 ],
                                 onTap: (i) {
                                   if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
@@ -166,35 +166,35 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                               const SizedBox(height: 16),
                               Row(
                                 children: [
-                                  const Text('Monto: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  // Usar la función formatCurrency
+                                  const Text('Amount: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  // Use the formatCurrency function
                                   Text(formatCurrency(expense!.amount, expense!.currency)),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               Row(
                                 children: [
-                                  const Text('Fecha: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const Text('Date: ', style: TextStyle(fontWeight: FontWeight.bold)),
                                   Text('${expense!.date.toLocal()}'.split(' ')[0]),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               Row(
                                 children: [
-                                  const Text('Categoría: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const Text('Category: ', style: TextStyle(fontWeight: FontWeight.bold)),
                                   Text(expense!.category ?? '-'),
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              const Text('Participantes:', style: TextStyle(fontWeight: FontWeight.bold)),
-                              // Usar _getUserName que ahora usa el mapa
+                              const Text('Participants:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              // Use _getUserName which now uses the map
                               ...expense!.participantIds.map((id) => Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 2),
                                     child: Text(_getUserName(id)),
                                   )),
                               const SizedBox(height: 16),
-                              const Text('Pagadores:', style: TextStyle(fontWeight: FontWeight.bold)),
-                              // Usar _getUserName que ahora usa el mapa
+                              const Text('Payers:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              // Use _getUserName which now uses the map
                               ...expense!.payers.map((p) => Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 2),
                                     child: Text('${_getUserName(p['userId'])}: ${formatCurrency((p['amount'] as num).toDouble(), expense!.currency)}'),
@@ -204,7 +204,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Adjuntos:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    const Text('Attachments:', style: TextStyle(fontWeight: FontWeight.bold)),
                                     ...expense!.attachments!.map((a) => Text(a)),
                                     const SizedBox(height: 16),
                                   ],
@@ -214,21 +214,21 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                                 children: [
                                   ElevatedButton.icon(
                                     icon: const Icon(Icons.edit),
-                                    label: const Text('Editar'),
+                                    label: const Text('Edit'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.teal,
                                       foregroundColor: Colors.white,
                                     ),
                                     onPressed: () {
-                                      // Asegurarse de pasar el mapa de participantes a la pantalla de edición
+                                      // Ensure to pass the participants map to the edit screen
                                       Navigator.pushNamed(
                                         context,
                                         '/group/${widget.groupId}/expense/${widget.expenseId}/edit',
                                         arguments: {
                                           'expense': expense,
-                                          'participantsMap': participantsMap, // Pasar el mapa
+                                          'participantsMap': participantsMap, // Pass the map
                                           'groupId': widget.groupId,
-                                          'groupName': groupName, // Pasar también el nombre del grupo
+                                          'groupName': groupName, // Also pass the group name
                                         },
                                       );
                                     },

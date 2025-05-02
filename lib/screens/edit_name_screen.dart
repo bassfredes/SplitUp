@@ -65,7 +65,6 @@ class _EditNameScreenState extends State<EditNameScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                // Corregido: Usar Color.fromRGBO o Color.fromARGB
                 color: const Color.fromRGBO(0, 0, 0, 0.07),
                 blurRadius: 24,
                 offset: const Offset(0, 8),

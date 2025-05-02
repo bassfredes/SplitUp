@@ -29,13 +29,13 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
     setState(() {
       _passwordStrength = score / 5.0;
       if (score <= 2) {
-        _passwordStrengthLabel = 'Débil';
+        _passwordStrengthLabel = 'Weak';
       } else if (score == 3) {
-        _passwordStrengthLabel = 'Media';
+        _passwordStrengthLabel = 'Medium';
       } else if (score == 4) {
-        _passwordStrengthLabel = 'Fuerte';
+        _passwordStrengthLabel = 'Strong';
       } else {
-        _passwordStrengthLabel = 'Muy fuerte';
+        _passwordStrengthLabel = 'Very strong';
       }
     });
   }
@@ -51,7 +51,7 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
         final cred = EmailAuthProvider.credential(email: email, password: password);
         await user.linkWithCredential(cred);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contraseña creada correctamente')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password created successfully')));
         Navigator.pop(context);
       }
     } on FirebaseAuthException catch (e) {
@@ -97,19 +97,19 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Crear contraseña', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                const Text('Create password', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
                 const SizedBox(height: 24),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Nueva contraseña'),
+                  decoration: const InputDecoration(labelText: 'New password'),
                   obscureText: true,
                   onChanged: _checkPasswordStrength,
                   validator: (value) {
-                    if (value == null || value.length < 8) return 'Mínimo 8 caracteres';
-                    if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Debe tener mayúscula';
-                    if (!RegExp(r'[a-z]').hasMatch(value)) return 'Debe tener minúscula';
-                    if (!RegExp(r'\\d').hasMatch(value)) return 'Debe tener número';
-                    if (!RegExp(r'[!@#\$&*~]').hasMatch(value)) return 'Debe tener carácter especial';
+                    if (value == null || value.length < 8) return 'Minimum 8 characters';
+                    if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Must contain uppercase letter';
+                    if (!RegExp(r'[a-z]').hasMatch(value)) return 'Must contain lowercase letter';
+                    if (!RegExp(r'\\d').hasMatch(value)) return 'Must contain number';
+                    if (!RegExp(r'[!@#\$&*~]').hasMatch(value)) return 'Must contain special character';
                     return null;
                   },
                   enabled: !_loading,
@@ -127,14 +127,14 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: 4, left: 4),
-                  child: Text('Fortaleza: $_passwordStrengthLabel', style: const TextStyle(fontSize: 12)),
+                  child: Text('Strength: $_passwordStrengthLabel', style: const TextStyle(fontSize: 12)),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _repeatController,
-                  decoration: const InputDecoration(labelText: 'Repetir contraseña'),
+                  decoration: const InputDecoration(labelText: 'Repeat password'),
                   obscureText: true,
-                  validator: (value) => value == _passwordController.text ? null : 'Las contraseñas no coinciden',
+                  validator: (value) => value == _passwordController.text ? null : 'Passwords do not match',
                   enabled: !_loading,
                 ),
                 if (_error != null) ...[
@@ -150,7 +150,7 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: _loading ? const CircularProgressIndicator(color: Colors.white) : const Text('Guardar'),
+                  child: _loading ? const CircularProgressIndicator(color: Colors.white) : const Text('Save'),
                 ),
               ],
             ),

@@ -51,7 +51,7 @@ class LoginScreen extends StatelessWidget {
                       height: 100,
                     ),
                     const SizedBox(height: 12),
-                    Text('Bienvenido a SplitUp',
+                    Text('Welcome to SplitUp',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                   ],
                 ),
@@ -94,7 +94,7 @@ class LoginScreen extends StatelessWidget {
                                   ),
                                 ),
                                 const Text(
-                                  'Iniciar sesión con Google',
+                                  'Sign in with Google',
                                   style: TextStyle(
                                     color: Color(0xFF1f1f1f),
                                     fontWeight: FontWeight.w500,
@@ -147,7 +147,7 @@ class LoginScreen extends StatelessWidget {
                                   ),
                                 ),
                                 const Text(
-                                  'Iniciar sesión con GitHub',
+                                  'Sign in with GitHub',
                                   style: TextStyle(
                                     color: Color(0xFF24292F),
                                     fontWeight: FontWeight.w500,
@@ -207,7 +207,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
   }
 
   void _checkPasswordStrength(String password) {
-    // Reglas: min 8, mayúscula, minúscula, número, especial
+    // Rules: min 8, uppercase, lowercase, number, special
     int score = 0;
     if (password.length >= 8) score++;
     if (RegExp(r'[A-Z]').hasMatch(password)) score++;
@@ -217,13 +217,13 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
     setState(() {
       _passwordStrength = score / 5.0;
       if (score <= 2) {
-        _passwordStrengthLabel = 'Débil';
+        _passwordStrengthLabel = 'Weak';
       } else if (score == 3) {
-        _passwordStrengthLabel = 'Media';
+        _passwordStrengthLabel = 'Medium';
       } else if (score == 4) {
-        _passwordStrengthLabel = 'Fuerte';
+        _passwordStrengthLabel = 'Strong';
       } else {
-        _passwordStrengthLabel = 'Muy fuerte';
+        _passwordStrengthLabel = 'Very strong';
       }
     });
   }
@@ -239,16 +239,16 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
         return StatefulBuilder(
           builder: (context, setState) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Recuperar contraseña'),
+            title: const Text('Reset password'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.'),
+                Text('Enter your email and we will send you a link to reset your password.'),
                 const SizedBox(height: 12),
                 TextField(
                   controller: emailController,
                   decoration: const InputDecoration(
-                    labelText: 'Correo electrónico',
+                    labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                   keyboardType: TextInputType.emailAddress,
@@ -259,7 +259,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
                 ],
                 if (sent) ...[
                   const SizedBox(height: 8),
-                  Text('Correo enviado. Revisa tu bandeja de entrada.', style: TextStyle(color: Colors.green)),
+                  Text('Email sent. Check your inbox.', style: TextStyle(color: Colors.green)),
                 ]
               ],
             ),
@@ -276,7 +276,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: Text(sent ? 'Cerrar' : 'Cancelar'),
+                      child: Text(sent ? 'Close' : 'Cancel'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -294,7 +294,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
                               setState(() { loading = true; error = null; });
                               final email = emailController.text.trim();
                               if (!email.contains('@')) {
-                                setState(() { error = 'Correo inválido'; loading = false; });
+                                setState(() { error = 'Invalid email'; loading = false; });
                                 return;
                               }
                               try {
@@ -309,10 +309,10 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
                               }
                             },
                       child: sent
-                          ? const Text('Correo enviado')
+                          ? const Text('Email sent')
                           : loading
                               ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Text('Enviar'),
+                              : const Text('Send'),
                     ),
                   ),
                 ],
@@ -336,40 +336,40 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             TextFormField(
               controller: _nameController,
               decoration: InputDecoration(
-                labelText: 'Nombre completo',
+                labelText: 'Full name',
                 prefixIcon: const Icon(Icons.person_outline, color: kPrimaryColor),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: Colors.grey[50],
               ),
-              validator: (value) => value != null && value.trim().isNotEmpty ? null : 'El nombre es obligatorio',
+              validator: (value) => value != null && value.trim().isNotEmpty ? null : 'Name is required',
             ),
             const SizedBox(height: 12),
           ],
           TextFormField(
             controller: _emailController,
             decoration: InputDecoration(
-              labelText: 'Correo electrónico',
+              labelText: 'Email',
               prefixIcon: const Icon(Icons.email_outlined, color: kPrimaryColor),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
               fillColor: Colors.grey[50],
             ),
-            validator: (value) => value != null && value.contains('@') ? null : 'Correo inválido',
+            validator: (value) => value != null && value.contains('@') ? null : 'Invalid email',
           ),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _showResetPasswordDialog,
               style: TextButton.styleFrom(foregroundColor: kPrimaryColor),
-              child: const Text('¿Olvidaste tu contraseña?'),
+              child: const Text('Forgot your password?'),
             ),
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _passwordController,
             decoration: InputDecoration(
-              labelText: 'Contraseña',
+              labelText: 'Password',
               prefixIcon: const Icon(Icons.lock_outline, color: kPrimaryColor),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
@@ -378,11 +378,11 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             obscureText: true,
             onChanged: _isRegister ? _checkPasswordStrength : null,
             validator: (value) {
-              if (value == null || value.length < 8) return 'Mínimo 8 caracteres';
-              if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Debe tener mayúscula';
-              if (!RegExp(r'[a-z]').hasMatch(value)) return 'Debe tener minúscula';
-              if (!RegExp(r'\d').hasMatch(value)) return 'Debe tener número';
-              if (!RegExp(r'[!@#\$&*~]').hasMatch(value)) return 'Debe tener carácter especial';
+              if (value == null || value.length < 8) return 'Minimum 8 characters';
+              if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Must contain uppercase letter';
+              if (!RegExp(r'[a-z]').hasMatch(value)) return 'Must contain lowercase letter';
+              if (!RegExp(r'\d').hasMatch(value)) return 'Must contain number';
+              if (!RegExp(r'[!@#\$&*~]').hasMatch(value)) return 'Must contain special character';
               return null;
             },
           ),
@@ -400,20 +400,20 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             ),
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 4),
-              child: Text('Fortaleza: $_passwordStrengthLabel', style: const TextStyle(fontSize: 12)),
+              child: Text('Strength: $_passwordStrengthLabel', style: const TextStyle(fontSize: 12)),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _repeatPasswordController,
               decoration: InputDecoration(
-                labelText: 'Repetir contraseña',
+                labelText: 'Repeat password',
                 prefixIcon: const Icon(Icons.lock_outline, color: kPrimaryColor),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: Colors.grey[50],
               ),
               obscureText: true,
-              validator: (value) => value == _passwordController.text ? null : 'Las contraseñas no coinciden',
+              validator: (value) => value == _passwordController.text ? null : 'Passwords do not match',
             ),
           ],
           if (_error != null) ...[
@@ -434,18 +434,18 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
                       await GRecaptchaV3.ready(recaptchaKey);
                       token = await GRecaptchaV3.execute(recaptchaKey);
                     } catch (e) {
-                      setState(() => _error = 'Error al validar reCAPTCHA: $e');
+                      setState(() => _error = 'Error validating reCAPTCHA: $e');
                       return;
                     }
                     if (token == null || token.isEmpty) {
-                      setState(() => _error = 'No se pudo validar reCAPTCHA.');
+                      setState(() => _error = 'Could not validate reCAPTCHA.');
                       return;
                     }
                   } else {
-                    setState(() => _error = 'La validación reCAPTCHA solo está disponible en la versión web.');
+                    setState(() => _error = 'reCAPTCHA validation is only available on the web version.');
                     return;
                   }
-                  // --- FIN reCAPTCHA ---
+                  // --- END reCAPTCHA ---
                   error = await authProvider.registerWithEmail(
                     _emailController.text,
                     _passwordController.text,
@@ -458,7 +458,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
                     await authProvider.signInWithEmail(_emailController.text, _passwordController.text);
                     navigator.pushReplacementNamed('/dashboard');
                   } on firebase_auth.FirebaseAuthException catch (e) {
-                    scaffoldMessenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Error desconocido')));
+                    scaffoldMessenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Unknown error')));
                   } catch (e) {
                     scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
                   }
@@ -474,7 +474,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text(_isRegister ? 'Registrarse' : 'Iniciar Sesión'),
+            child: Text(_isRegister ? 'Sign up' : 'Sign in'),
           ),
           TextButton(
             onPressed: () {
@@ -483,7 +483,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             style: TextButton.styleFrom(
               foregroundColor: kPrimaryColor,
             ),
-            child: Text(_isRegister ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'),
+            child: Text(_isRegister ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up'),
           ),
         ],
       ),

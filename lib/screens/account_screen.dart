@@ -20,10 +20,10 @@ class AccountScreen extends StatelessWidget {
         onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
         onAccount: () {},
         onLogout: () async {
-          // Guardar el contexto antes del async gap
+          // Save the context before the async gap
           final navigator = Navigator.of(context);
           await authProvider.signOut();
-          // Usar el contexto guardado
+          // Use the saved context
           navigator.pushReplacementNamed('/login');
         },
       ),
@@ -39,7 +39,7 @@ class AccountScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                // Corregido: Usar Color.fromRGBO o Color.fromARGB
+                // Fixed: Use Color.fromRGBO or Color.fromARGB
                 color: const Color.fromRGBO(0, 0, 0, 0.07),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
@@ -56,7 +56,7 @@ class AccountScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircleAvatar(
-                          radius: 28, // Igual que en dashboard
+                          radius: 28, // Same as in dashboard
                           backgroundColor: kPrimaryColor,
                           backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
                               ? NetworkImage(user.photoUrl!)
@@ -77,7 +77,7 @@ class AccountScreen extends StatelessWidget {
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
                       icon: const Icon(Icons.edit),
-                      label: const Text('Editar nombre'),
+                      label: const Text('Edit name'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kPrimaryColor,
                         foregroundColor: Colors.white,
@@ -90,7 +90,7 @@ class AccountScreen extends StatelessWidget {
                     if (firebaseUser?.providerData.any((p) => p.providerId == 'password') ?? false)
                       ElevatedButton.icon(
                         icon: const Icon(Icons.lock),
-                        label: const Text('Cambiar contraseña'),
+                        label: const Text('Change password'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimaryColor,
                           foregroundColor: Colors.white,
@@ -102,7 +102,7 @@ class AccountScreen extends StatelessWidget {
                     else
                       ElevatedButton.icon(
                         icon: const Icon(Icons.lock_open),
-                        label: const Text('Crear contraseña'),
+                        label: const Text('Create password'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimaryColor,
                           foregroundColor: Colors.white,
@@ -115,8 +115,8 @@ class AccountScreen extends StatelessWidget {
                     ElevatedButton.icon(
                       icon: const Icon(Icons.account_circle),
                       label: Text((firebaseUser?.providerData.any((p) => p.providerId == 'google.com') ?? false)
-                          ? 'Desvincular Google'
-                          : 'Vincular Google'),
+                          ? 'Unlink Google'
+                          : 'Link Google'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: kPrimaryColor,
@@ -130,8 +130,8 @@ class AccountScreen extends StatelessWidget {
                     ElevatedButton.icon(
                       icon: const Icon(Icons.account_circle),
                       label: Text((firebaseUser?.providerData.any((p) => p.providerId == 'github.com') ?? false)
-                          ? 'Desvincular GitHub'
-                          : 'Vincular GitHub'),
+                          ? 'Unlink GitHub'
+                          : 'Link GitHub'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,

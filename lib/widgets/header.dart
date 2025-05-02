@@ -42,13 +42,13 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
                   ),
                   ),
                   const SizedBox(width: 24),
-                  // Espacio flexible
+                  // Flexible space
                   Expanded(child: Container()),
-                  // Botón Grupos
+                  // Groups button
                   TextButton(
                   onPressed: onGroups,
                   child: Text(
-                    'Grupos',
+                    'Groups',
                     style: TextStyle(
                     color: currentRoute == '/groups' || currentRoute == '/group_detail' || currentRoute == '/expense_detail' ? kPrimaryColor : Colors.grey[700],
                     fontWeight: currentRoute == '/groups' || currentRoute == '/group_detail' || currentRoute == '/expense_detail' ? FontWeight.bold : FontWeight.normal,
@@ -56,7 +56,7 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
                   ),
                   ),
                   const SizedBox(width: 8),
-                // Menú Cuenta
+                // Account menu
                 PopupMenuButton<String>(
                   icon: Icon(Icons.account_circle, color: currentRoute == '/account' ? kPrimaryColor : Colors.grey[700]),
                   onSelected: (value) {
@@ -66,11 +66,11 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
                   itemBuilder: (context) => [
                     PopupMenuItem(
                       value: 'account',
-                      child: Text('Mi cuenta'),
+                      child: Text('My account'),
                     ),
                     PopupMenuItem(
                       value: 'logout',
-                      child: Text('Salir'),
+                      child: Text('Log out'),
                     ),
                   ],
                 ),

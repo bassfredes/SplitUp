@@ -19,7 +19,7 @@ class ExpenseTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Pagador principal (el primero de la lista payers)
+    // Main payer (the first in the payers list)
     final payerId = expense.payers.isNotEmpty ? expense.payers.first['userId'] as String : expense.createdBy;
     final payer = usersById[payerId];
     // Avatar
@@ -33,10 +33,10 @@ class ExpenseTile extends StatelessWidget {
               style: const TextStyle(fontSize: 22, color: Colors.white),
             ),
           );
-    // Ícono de categoría
+    // Category icon
     final categoryIcon = _getCategoryIcon(expense.category);
     final textColor = DefaultTextStyle.of(context).style.color;
-    // Monto que le corresponde al usuario actual
+    // Amount corresponding to the current user
     double userShare = 0.0;
     if (expense.customSplits != null) {
       final split = expense.customSplits!.firstWhere(
@@ -49,7 +49,7 @@ class ExpenseTile extends StatelessWidget {
     } else if (expense.participantIds.contains(currentUserId)) {
       userShare = expense.amount / expense.participantIds.length;
     }
-    // ¿Pagó el usuario?
+    // Did the user pay?
     double paidByUser = 0.0;
     for (final p in expense.payers) {
       if (p['userId'] == currentUserId) {
@@ -58,7 +58,7 @@ class ExpenseTile extends StatelessWidget {
     }
     final net = paidByUser - userShare;
     final netColor = net < 0 ? Colors.red : (net > 0 ? Colors.green : Colors.grey[700]);
-    final netLabel = net < 0 ? 'Debes' : (net > 0 ? 'Te deben' : 'Saldo');
+    final netLabel = net < 0 ? 'You owe' : (net > 0 ? 'You are owed' : 'Settled');
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -78,7 +78,7 @@ class ExpenseTile extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Pagó: ${payer?.name ?? payerId}'),
+            Text('Paid by: ${payer?.name ?? payerId}'),
             Text(expense.date.toLocal().toString().split(' ')[0]),
           ],
         ),
@@ -97,7 +97,7 @@ class ExpenseTile extends StatelessWidget {
                 style: TextStyle(color: netColor, fontWeight: FontWeight.w600, fontSize: 13),
               )
             else
-              const Text('Saldo:  \$ 0', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 13)),
+              const Text('Settled: \$ 0', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 13)),
           ],
         ),
         isThreeLine: true,

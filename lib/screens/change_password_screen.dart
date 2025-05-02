@@ -30,7 +30,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       await user.reauthenticateWithCredential(cred);
       await user.updatePassword(_newController.text.trim());
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contraseña actualizada correctamente')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated successfully')));
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       setState(() { _error = e.message; });
@@ -75,29 +75,29 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Cambiar contraseña', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                const Text('Change password', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
                 const SizedBox(height: 24),
                 TextFormField(
                   controller: _currentController,
-                  decoration: const InputDecoration(labelText: 'Contraseña actual'),
+                  decoration: const InputDecoration(labelText: 'Current password'),
                   obscureText: true,
-                  validator: (v) => v != null && v.length >= 8 ? null : 'Mínimo 8 caracteres',
+                  validator: (v) => v != null && v.length >= 8 ? null : 'Minimum 8 characters',
                   enabled: !_loading,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _newController,
-                  decoration: const InputDecoration(labelText: 'Nueva contraseña'),
+                  decoration: const InputDecoration(labelText: 'New password'),
                   obscureText: true,
-                  validator: (v) => v != null && v.length >= 8 ? null : 'Mínimo 8 caracteres',
+                  validator: (v) => v != null && v.length >= 8 ? null : 'Minimum 8 characters',
                   enabled: !_loading,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _repeatController,
-                  decoration: const InputDecoration(labelText: 'Repetir nueva contraseña'),
+                  decoration: const InputDecoration(labelText: 'Repeat new password'),
                   obscureText: true,
-                  validator: (v) => v == _newController.text ? null : 'Las contraseñas no coinciden',
+                  validator: (v) => v == _newController.text ? null : 'Passwords do not match',
                   enabled: !_loading,
                 ),
                 if (_error != null) ...[
@@ -113,7 +113,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: _loading ? const CircularProgressIndicator(color: Colors.white) : const Text('Guardar'),
+                  child: _loading ? const CircularProgressIndicator(color: Colors.white) : const Text('Save'),
                 ),
               ],
             ),

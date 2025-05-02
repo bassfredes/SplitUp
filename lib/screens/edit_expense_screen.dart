@@ -33,7 +33,7 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
       final groupDoc = await FirebaseFirestore.instance.collection('groups').doc(widget.groupId).get();
       if (!groupDoc.exists) {
         setState(() {
-          error = 'Grupo no encontrado';
+          error = 'Group not found';
           loading = false;
         });
         return;
@@ -47,7 +47,7 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
           .get();
       if (!doc.exists) {
         setState(() {
-          error = 'Gasto no encontrado';
+          error = 'Expense not found';
           loading = false;
         });
         return;
@@ -64,7 +64,7 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
       });
     } catch (e) {
       setState(() {
-        error = 'Error al cargar el gasto o grupo';
+        error = 'Error loading expense or group';
         loading = false;
       });
     }

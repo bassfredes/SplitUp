@@ -27,7 +27,7 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) throw Exception('No se seleccionó cuenta de Google');
+      if (googleUser == null) throw Exception('No Google account selected');
       final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
@@ -36,7 +36,7 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
       await FirebaseAuth.instance.currentUser?.linkWithCredential(credential);
       if (!mounted) return;
       setState(() { _isLinked = true; });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google vinculado correctamente')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google linked successfully')));
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       setState(() { _error = e.message; });
@@ -51,17 +51,17 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Desvincular Google'),
-        content: const Text('¿Estás seguro de que deseas desvincular tu cuenta de Google? Podrías perder acceso si no tienes otra forma de inicio de sesión.'),
+        title: const Text('Unlink Google'),
+        content: const Text('Are you sure you want to unlink your Google account? You may lose access if you do not have another login method.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Desvincular'),
+            child: const Text('Unlink'),
           ),
         ],
       ),
@@ -72,7 +72,7 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
       await FirebaseAuth.instance.currentUser?.unlink('google.com');
       if (!mounted) return;
       setState(() { _isLinked = false; });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google desvinculado correctamente')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google unlinked successfully')));
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       setState(() { _error = e.message; });
@@ -115,7 +115,7 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(_isLinked ? 'Desvincular Google' : 'Vincular Google', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+              Text(_isLinked ? 'Unlink Google' : 'Link Google', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
               const SizedBox(height: 24),
               if (_error != null) ...[
                 Text(_error!, style: const TextStyle(color: Colors.red)),
@@ -123,7 +123,7 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
               ],
               ElevatedButton.icon(
                 icon: Icon(_isLinked ? Icons.link_off : Icons.link),
-                label: Text(_isLinked ? 'Desvincular Google' : 'Vincular Google'),
+                label: Text(_isLinked ? 'Unlink Google' : 'Link Google'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _isLinked ? Colors.red : kPrimaryColor,
                   foregroundColor: Colors.white,

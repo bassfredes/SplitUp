@@ -52,7 +52,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     final groupProvider = Provider.of<GroupProvider>(context, listen: false);
     final user = authProvider.user!;
     final groups = groupProvider.groups;
-    // Sumar balances por moneda
+    // Sum balances by currency
     final Map<String, double> totalBalances = {};
     for (final group in groups) {
       for (final item in group.participantBalances) {
@@ -84,7 +84,7 @@ class _DashboardContentState extends State<_DashboardContent> {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Text(
-          'No tienes saldos pendientes en ningún grupo.',
+          'You have no pending balances in any group.',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
         ),
       );
@@ -98,7 +98,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Resumen de tus balances', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 10),
             ...balances.entries.map((e) {
               final color = e.value > 0.01
@@ -142,7 +142,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         backgroundColor: kPrimaryColor,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.group_add),
-        label: const Text('Nuevo grupo', style: TextStyle(color: Colors.white)),
+        label: const Text('New group', style: TextStyle(color: Colors.white)),
         onPressed: () => _showCreateGroupDialog(context, user.id),
       ),
       body: Container(
@@ -175,7 +175,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                   children: [
                     Breadcrumb(
                       items: [
-                        BreadcrumbItem('Inicio'),
+                        BreadcrumbItem('Home'),
                         BreadcrumbItem('Dashboard'),
                       ],
                       onTap: (i) {
@@ -217,7 +217,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                       ],
                     ),
                     const SizedBox(height: 32),
-                    // --- RESUMEN DE BALANCES ---
+                    // --- BALANCE SUMMARY ---
                     FutureBuilder<Map<String, double>>(
                       future: _balancesFuture,
                       builder: (context, snapshot) {
@@ -230,15 +230,15 @@ class _DashboardContentState extends State<_DashboardContent> {
                         if (snapshot.hasError) {
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Text('Error al cargar balances', style: TextStyle(color: Colors.red[700])),
+                            child: Text('Error loading balances', style: TextStyle(color: Colors.red[700])),
                           );
                         }
                         return _buildBalanceSummary(snapshot.data ?? {});
                       },
                     ),
-                    // --- FIN RESUMEN DE BALANCES ---
+                    // --- END BALANCE SUMMARY ---
                     Text(
-                      'Tus grupos',
+                      'Your groups',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         color: kPrimaryColor,
                         fontWeight: FontWeight.bold,
@@ -247,7 +247,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Aquí puedes ver y gestionar todos tus grupos de gastos compartidos.',
+                      'Here you can view and manage all your shared expense groups.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
                     ),
                     const SizedBox(height: 16),
@@ -257,7 +257,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 32),
                         child: Text(
-                          'No tienes grupos aún. ¡Crea uno nuevo!',
+                          'You have no groups yet. Create a new one!',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
                         ),
@@ -288,7 +288,7 @@ class _GroupCard extends StatelessWidget {
   final String currentUserId;
   const _GroupCard({required this.group, required this.currentUserId});
 
-  // Función para obtener todos los participantes del grupo
+  // Function to fetch all group participants
   Future<Map<String, UserModel>> _fetchParticipants(List<String> userIds) async {
     if (userIds.isEmpty) return {};
     final usersSnap = await FirebaseFirestore.instance
@@ -298,18 +298,17 @@ class _GroupCard extends StatelessWidget {
     return { for (var doc in usersSnap.docs) doc.id : UserModel.fromMap(doc.data(), doc.id) };
   }
 
-
   @override
   Widget build(BuildContext context) {
     if (group.id.isEmpty) {
       return const SizedBox.shrink();
     }
-    // Usar un FutureBuilder principal para obtener los participantes Y el último gasto
+    // Use a main FutureBuilder to fetch participants AND the last expense
     return FutureBuilder<Map<String, dynamic>>(
       future: () async {
-        // Obtener participantes
+        // Fetch participants
         final participantsMap = await _fetchParticipants(group.participantIds);
-        // Obtener último gasto
+        // Fetch last expense
         final expenseSnap = await FirebaseFirestore.instance
             .collection('groups')
             .doc(group.id)
@@ -325,7 +324,7 @@ class _GroupCard extends StatelessWidget {
       }(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          // Puedes mostrar un placeholder mientras carga
+          // You can show a placeholder while loading
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
             elevation: 3,
@@ -334,8 +333,8 @@ class _GroupCard extends StatelessWidget {
           );
         }
         if (snapshot.hasError || !snapshot.hasData) {
-           // Manejar error o falta de datos si es necesario
-           return const SizedBox.shrink(); // O mostrar un mensaje de error
+           // Handle error or missing data if needed
+           return const SizedBox.shrink(); // Or show an error message
         }
 
         final participantsMap = snapshot.data!['participants'] as Map<String, UserModel>;
@@ -346,7 +345,7 @@ class _GroupCard extends StatelessWidget {
         final String? lastCurrency = lastExpense?.currency;
         final double? lastAmount = lastExpense?.amount;
         
-        // Intentar obtener el ID del creador o del primer pagador
+        // Try to get the creator ID or the first payer
         String? userIdToShow;
         if (lastExpense != null) {
           if (lastExpense.createdBy.isNotEmpty) {
@@ -378,7 +377,7 @@ class _GroupCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Foto o placeholder
+                  // Photo or placeholder
                   CircleAvatar(
                     radius: 38,
                     backgroundColor: Colors.grey[200],
@@ -390,7 +389,7 @@ class _GroupCard extends StatelessWidget {
                         : null,
                   ),
                   const SizedBox(width: 24),
-                  // Info principal y balance + último gasto alineados
+                  // Main info and balance + last expense aligned
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -416,7 +415,7 @@ class _GroupCard extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                  // Mi balance en una sola línea
+                                  // My balance in a single line
                                   FutureBuilder<QuerySnapshot>(
                                     future: FirebaseFirestore.instance
                                         .collection('groups')
@@ -430,12 +429,12 @@ class _GroupCard extends StatelessWidget {
                                       if (snap.hasData) {
                                         for (var doc in snap.data!.docs) {
                                           final exp = ExpenseModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-                                          final pagado = exp.payers.where((p) => p['userId'] == currentUserId).fold<double>(0, (a, b) => a + (b['amount'] as num).toDouble());
-                                          final esParticipante = exp.participantIds.contains(currentUserId);
-                                          final parte = esParticipante
+                                          final paid = exp.payers.where((p) => p['userId'] == currentUserId).fold<double>(0, (a, b) => a + (b['amount'] as num).toDouble());
+                                          final isParticipant = exp.participantIds.contains(currentUserId);
+                                          final share = isParticipant
                                               ? (exp.splitType == 'equal' ? exp.amount / exp.participantIds.length : _getUserShare(exp, currentUserId))
                                               : 0;
-                                          balance += pagado - parte;
+                                          balance += paid - share;
                                         }
                                       }
                                       Color color;
@@ -446,82 +445,82 @@ class _GroupCard extends StatelessWidget {
                                       } else {
                                         color = Colors.grey[600]!;
                                       }
-                                      String balanceStr = formatCurrency(balance, currency); // Usar formatCurrency
+                                      String balanceStr = formatCurrency(balance, currency); // Use formatCurrency
                                       return Padding(
                                         padding: const EdgeInsets.only(bottom: 8),
                                         child: Text(
-                                          'Mi balance: $balanceStr',
+                                          'My balance: $balanceStr',
                                           style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 16),
                                         ),
                                       );
                                     },
                                   ),
-                                  // Último gasto (descripción y valor juntos, alineados a la izquierda)
+                                  // Last expense (description and value together, left aligned)
                                   if (lastExpense != null)
-                                    Padding( // Añadir padding para espaciado vertical
-                                      padding: const EdgeInsets.only(bottom: 4.0), // Espacio debajo de esta línea
+                                    Padding( // Add padding for vertical spacing
+                                      padding: const EdgeInsets.only(bottom: 4.0), // Space below this line
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(Icons.receipt_long, size: 16, color: Colors.grey), // Icono gris y más pequeño
+                                          const Icon(Icons.receipt_long, size: 16, color: Colors.grey), // Gray and smaller icon
                                           const SizedBox(width: 6),
                                           Text(
-                                            'Último gasto: "${lastDesc ?? ''}"',
-                                            style: const TextStyle(fontSize: 14, color: Colors.grey), // Texto gris
+                                            'Last expense: "${lastDesc ?? ''}"',
+                                            style: const TextStyle(fontSize: 14, color: Colors.grey), // Gray text
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
-                                            formatCurrency(lastAmount ?? 0, lastCurrency ?? group.currency), // Usar formatCurrency
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey), // Texto gris y peso normal
+                                            formatCurrency(lastAmount ?? 0, lastCurrency ?? group.currency), // Use formatCurrency
+                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey), // Gray text and normal weight
                                           ),
                                         ],
                                       ),
                                     ),
                                   if (lastExpense != null)
                                     Padding(
-                                      padding: const EdgeInsets.only(top: 0), // Ajustar padding superior a 0
+                                      padding: const EdgeInsets.only(top: 0), // Set top padding to 0
                                       child: Row(
                                         children: [
                                           const Icon(Icons.person, size: 16, color: Colors.grey),
                                           const SizedBox(width: 4),
-                                          // Lógica para mostrar el nombre:
+                                          // Logic to show the name:
                                           if (nameToShow != null)
-                                            // Si lo encontramos en el mapa de participantes actuales, mostrarlo
+                                            // If found in the current participants map, show it
                                             Text(
-                                              'por $nameToShow',
+                                              'by $nameToShow',
                                               style: const TextStyle(fontSize: 13, color: Colors.grey),
                                             )
                                           else if (userIdToShow != null && userIdToShow.isNotEmpty)
-                                            // Si no está en el mapa pero tenemos ID, buscarlo con FutureBuilder
+                                            // If not in the map but we have the ID, fetch it with FutureBuilder
                                             FutureBuilder<DocumentSnapshot>(
                                               future: FirebaseFirestore.instance.collection('users').doc(userIdToShow).get(),
                                               builder: (context, userSnap) {
-                                                String name = 'Alguien'; // Default
+                                                String name = 'Someone'; // Default
                                                 if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
                                                   final data = userSnap.data!.data() as Map<String, dynamic>;
-                                                  name = data['name'] ?? 'Alguien';
+                                                  name = data['name'] ?? 'Someone';
                                                 } else if (userSnap.connectionState == ConnectionState.waiting) {
-                                                  name = '...'; // Placeholder mientras carga
+                                                  name = '...'; // Placeholder while loading
                                                 }
                                                 return Text(
-                                                  'por $name',
+                                                  'by $name',
                                                   style: const TextStyle(fontSize: 13, color: Colors.grey),
                                                 );
                                               },
                                             )
                                           else
-                                            // Si no hay ID válido, mostrar "Alguien"
+                                            // If no valid ID, show "Someone"
                                             const Text(
-                                              'por Alguien',
+                                              'by Someone',
                                               style: TextStyle(fontSize: 13, color: Colors.grey),
                                             ),
                                           const SizedBox(width: 12),
                                           const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
                                           const SizedBox(width: 4),
                                           Text(
-                                            formatDateShort(lastDate), // Usar formatDateShort
+                                            formatDateShort(lastDate), // Use formatDateShort
                                             style: const TextStyle(fontSize: 13, color: Colors.grey),
                                           ),
                                         ],
@@ -544,6 +543,7 @@ class _GroupCard extends StatelessWidget {
     );
   }
 
+  // Helper to get the user's share in an expense
   static double _getUserShare(ExpenseModel exp, String userId) {
     if (exp.splitType == 'equal') {
       return exp.amount / exp.participantIds.length;
@@ -615,17 +615,17 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
                   const SizedBox(height: 12),
                   TextField(
                     controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Nombre del grupo'),
+                    decoration: const InputDecoration(labelText: 'Group name'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: descController,
-                    decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+                    decoration: const InputDecoration(labelText: 'Description (optional)'),
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Text('Moneda: '),
+                      const Text('Currency: '),
                       const SizedBox(width: 8),
                       DropdownButton<String>(
                         value: currency,
@@ -662,7 +662,7 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
+              child: const Text('Cancel'),
             ),
             Builder(
               builder: (dialogContext) => ElevatedButton(
@@ -680,7 +680,7 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
                             await ref.putFile(File(imagePath!));
                             photoUrl = await ref.getDownloadURL();
                           } catch (e) {
-                            setState(() { uploading = false; uploadError = 'Error al subir la imagen'; });
+                            setState(() { uploading = false; uploadError = 'Error uploading image'; });
                             return;
                           }
                           setState(() { uploading = false; });
@@ -703,12 +703,12 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
                         } catch (e) {
                           setState(() {
                             errorMsg = e.toString().contains('permission-denied')
-                              ? 'No tienes permisos para crear el grupo. Verifica tus reglas de Firestore.'
-                              : 'Error al crear el grupo: ${e.toString()}';
+                              ? 'You do not have permission to create the group. Check your Firestore rules.'
+                              : 'Error creating group: ${e.toString()}';
                           });
                         }
                       },
-                child: const Text('Crear'),
+                child: const Text('Create'),
               ),
             ),
           ],

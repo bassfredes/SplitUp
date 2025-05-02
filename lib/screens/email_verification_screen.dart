@@ -22,7 +22,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       await user?.sendEmailVerification();
       setState(() { _isSent = true; });
     } catch (e) {
-      setState(() { _error = 'Error al enviar el correo: $e'; });
+      setState(() { _error = 'Error sending email: $e'; });
     } finally {
       setState(() { _isSending = false; });
     }
@@ -37,10 +37,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/dashboard');
       } else {
-        setState(() { _error = 'Aún no has verificado tu correo.'; });
+        setState(() { _error = 'You have not verified your email yet.'; });
       }
     } catch (e) {
-      setState(() { _error = 'Error al verificar: $e'; });
+      setState(() { _error = 'Error verifying: $e'; });
     } finally {
       setState(() { _isReloading = false; });
     }
@@ -57,7 +57,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Verifica tu correo'),
+        title: const Text('Verify your email'),
         backgroundColor: kPrimaryColor,
         automaticallyImplyLeading: false,
       ),
@@ -70,7 +70,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                // Corregido: Usar Color.fromRGBO o Color.fromARGB
+                // Corrected: Use Color.fromRGBO or Color.fromARGB
                 color: const Color.fromRGBO(0, 0, 0, 0.07),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
@@ -83,7 +83,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             children: [
               const Icon(Icons.email_outlined, size: 56, color: kPrimaryColor),
               const SizedBox(height: 16),
-              Text('Te enviamos un correo de verificación a:', textAlign: TextAlign.center),
+              Text('We sent a verification email to:', textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text(user?.email ?? '', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
@@ -92,11 +92,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 const SizedBox(height: 8),
               ],
               if (_isSent)
-                const Text('Correo enviado. Revisa tu bandeja de entrada o spam.', style: TextStyle(color: Colors.green)),
+                const Text('Email sent. Check your inbox or spam folder.', style: TextStyle(color: Colors.green)),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 icon: const Icon(Icons.refresh),
-                label: const Text('Ya verifiqué mi correo'),
+                label: const Text('I have verified my email'),
                 onPressed: _isReloading ? null : _checkVerification,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryColor,
@@ -108,7 +108,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               const SizedBox(height: 12),
               ElevatedButton.icon(
                 icon: const Icon(Icons.send),
-                label: Text(_isSending ? 'Enviando...' : 'Reenviar correo'),
+                label: Text(_isSending ? 'Sending...' : 'Resend email'),
                 onPressed: _isSending ? null : _sendVerificationEmail,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
@@ -120,7 +120,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               const SizedBox(height: 12),
               TextButton(
                 onPressed: _logout,
-                child: const Text('Cerrar sesión'),
+                child: const Text('Log out'),
               ),
             ],
           ),
