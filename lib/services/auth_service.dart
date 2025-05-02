@@ -5,8 +5,6 @@ import '../models/user_model.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/material.dart'; // Importar para Color
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;

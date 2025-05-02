@@ -489,28 +489,4 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
       ),
     );
   }
-
-  Future<void> _signInWithGoogle() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    try {
-      await authProvider.signInWithGoogle();
-      navigator.pushReplacementNamed('/dashboard');
-    } catch (e) {
-      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error con Google: ${e.toString()}')));
-    }
-  }
-
-  Future<void> _signInWithGitHub() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    try {
-      await authProvider.signInWithGitHub();
-      navigator.pushReplacementNamed('/dashboard');
-    } catch (e) {
-      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error con GitHub: ${e.toString()}')));
-    }
-  }
 }
