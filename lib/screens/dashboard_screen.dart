@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../models/group_model.dart';
@@ -14,6 +15,7 @@ import '../config/constants.dart';
 import '../widgets/breadcrumb.dart';
 import '../widgets/header.dart';
 import '../utils/formatters.dart';
+import '../screens/add_expense_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -278,12 +280,39 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 }
 
-class _GroupCard extends StatelessWidget {
+class _GroupCard extends StatefulWidget {
   final GroupModel group;
   final String currentUserId;
   const _GroupCard({required this.group, required this.currentUserId});
 
-  // Function to fetch all group participants
+  @override
+  State<_GroupCard> createState() => _GroupCardState();
+}
+
+class _GroupCardState extends State<_GroupCard> {
+  bool _hovering = false;
+  late Future<Map<String, dynamic>> _futureData;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureData = () async {
+      final participantsMap = await _fetchParticipants(widget.group.participantIds);
+      final expenseSnap = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.group.id)
+          .collection('expenses')
+          .orderBy('date', descending: true)
+          .limit(1)
+          .get();
+      ExpenseModel? lastExpense;
+      if (expenseSnap.docs.isNotEmpty) {
+        lastExpense = ExpenseModel.fromMap(expenseSnap.docs.first.data(), expenseSnap.docs.first.id);
+      }
+      return {'participants': participantsMap, 'lastExpense': lastExpense};
+    }();
+  }
+
   Future<Map<String, UserModel>> _fetchParticipants(List<String> userIds) async {
     if (userIds.isEmpty) return {};
     final usersSnap = await FirebaseFirestore.instance
@@ -293,33 +322,30 @@ class _GroupCard extends StatelessWidget {
     return { for (var doc in usersSnap.docs) doc.id : UserModel.fromMap(doc.data(), doc.id) };
   }
 
+  void _openAddExpense(BuildContext context, List<UserModel> participants, String currency) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddExpenseScreen(
+          groupId: widget.group.id,
+          participants: participants,
+          currentUserId: widget.currentUserId,
+          groupCurrency: currency,
+          groupName: widget.group.name,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (group.id.isEmpty) {
+    if (widget.group.id.isEmpty) {
       return const SizedBox.shrink();
     }
-    // Use a main FutureBuilder to fetch participants AND the last expense
     return FutureBuilder<Map<String, dynamic>>(
-      future: () async {
-        // Fetch participants
-        final participantsMap = await _fetchParticipants(group.participantIds);
-        // Fetch last expense
-        final expenseSnap = await FirebaseFirestore.instance
-            .collection('groups')
-            .doc(group.id)
-            .collection('expenses')
-            .orderBy('date', descending: true)
-            .limit(1)
-            .get();
-        ExpenseModel? lastExpense;
-        if (expenseSnap.docs.isNotEmpty) {
-          lastExpense = ExpenseModel.fromMap(expenseSnap.docs.first.data(), expenseSnap.docs.first.id);
-        }
-        return {'participants': participantsMap, 'lastExpense': lastExpense};
-      }(),
+      future: _futureData,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          // You can show a placeholder while loading
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
             elevation: 3,
@@ -328,38 +354,15 @@ class _GroupCard extends StatelessWidget {
           );
         }
         if (snapshot.hasError || !snapshot.hasData) {
-           // Handle error or missing data if needed
-           return const SizedBox.shrink(); // Or show an error message
+          return const SizedBox.shrink();
         }
-
         final participantsMap = snapshot.data!['participants'] as Map<String, UserModel>;
         final ExpenseModel? lastExpense = snapshot.data!['lastExpense'];
+        final participants = participantsMap.values.toList();
+        final group = widget.group;
+        final currency = group.currency;
 
-        final DateTime? lastDate = lastExpense?.date;
-        final String? lastDesc = lastExpense?.description; 
-        final String? lastCurrency = lastExpense?.currency;
-        final double? lastAmount = lastExpense?.amount;
-        
-        // Try to get the creator ID or the first payer
-        String? userIdToShow;
-        if (lastExpense != null) {
-          if (lastExpense.createdBy.isNotEmpty) {
-            userIdToShow = lastExpense.createdBy;
-          } else if (lastExpense.payers.isNotEmpty && lastExpense.payers[0]['userId'] != null) {
-            userIdToShow = lastExpense.payers[0]['userId'];
-            // --- DEBUG PRINT --- 
-            print('[DEBUG Dashboard Card - Group: ${group.name}] Using Payer ID: $userIdToShow because createdBy is empty.');
-            // --- END DEBUG --- 
-          }
-        }
-
-        String? nameToShow = participantsMap[userIdToShow]?.name;
-
-        // --- DEBUG PRINT --- 
-        print('[DEBUG Dashboard Card - Group: ${group.name}] User ID to Show: $userIdToShow, Found in Map: ${nameToShow != null}, Name from Map: $nameToShow');
-        // --- END DEBUG --- 
-
-        return Card(
+        Widget cardContent = Card(
           margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
           elevation: 3,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -424,10 +427,10 @@ class _GroupCard extends StatelessWidget {
                                       if (snap.hasData) {
                                         for (var doc in snap.data!.docs) {
                                           final exp = ExpenseModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-                                          final paid = exp.payers.where((p) => p['userId'] == currentUserId).fold<double>(0, (a, b) => a + (b['amount'] as num).toDouble());
-                                          final isParticipant = exp.participantIds.contains(currentUserId);
+                                          final paid = exp.payers.where((p) => p['userId'] == widget.currentUserId).fold<double>(0, (a, b) => a + (b['amount'] as num).toDouble());
+                                          final isParticipant = exp.participantIds.contains(widget.currentUserId);
                                           final share = isParticipant
-                                              ? (exp.splitType == 'equal' ? exp.amount / exp.participantIds.length : _getUserShare(exp, currentUserId))
+                                              ? (exp.splitType == 'equal' ? exp.amount / exp.participantIds.length : _getUserShare(exp, widget.currentUserId))
                                               : 0;
                                           balance += paid - share;
                                         }
@@ -460,7 +463,7 @@ class _GroupCard extends StatelessWidget {
                                           const Icon(Icons.receipt_long, size: 16, color: Colors.grey), // Gray and smaller icon
                                           const SizedBox(width: 6),
                                           Text(
-                                            'Last expense: "${lastDesc ?? ''}"',
+                                            'Last expense: "${lastExpense.description}"',
                                             style: const TextStyle(
                                               fontSize: 14,
                                               color: Colors.grey,
@@ -470,7 +473,7 @@ class _GroupCard extends StatelessWidget {
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
-                                            formatCurrency(lastAmount ?? 0, lastCurrency ?? group.currency), // Use formatCurrency
+                                            formatCurrency(lastExpense.amount, lastExpense.currency), // Use formatCurrency
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w500,
                                               fontSize: 14,
@@ -488,16 +491,16 @@ class _GroupCard extends StatelessWidget {
                                           const Icon(Icons.person, size: 16, color: Colors.grey),
                                           const SizedBox(width: 4),
                                           // Logic to show the name:
-                                          if (nameToShow != null)
+                                          if (participantsMap[lastExpense.createdBy]?.name != null)
                                             // If found in the current participants map, show it
                                             Text(
-                                              'by $nameToShow',
+                                              'by ${participantsMap[lastExpense.createdBy]?.name}',
                                               style: const TextStyle(fontSize: 13, color: Colors.grey),
                                             )
-                                          else if (userIdToShow != null && userIdToShow.isNotEmpty)
+                                          else if (lastExpense.createdBy.isNotEmpty)
                                             // If not in the map but we have the ID, fetch it with FutureBuilder
                                             FutureBuilder<DocumentSnapshot>(
-                                              future: FirebaseFirestore.instance.collection('users').doc(userIdToShow).get(),
+                                              future: FirebaseFirestore.instance.collection('users').doc(lastExpense.createdBy).get(),
                                               builder: (context, userSnap) {
                                                 String name = 'Someone'; // Default
                                                 if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
@@ -522,7 +525,7 @@ class _GroupCard extends StatelessWidget {
                                           const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
                                           const SizedBox(width: 4),
                                           Text(
-                                            formatDateShort(lastDate), // Use formatDateShort
+                                            formatDateShort(lastExpense.date), // Use formatDateShort
                                             style: const TextStyle(fontSize: 13, color: Colors.grey),
                                           ),
                                         ],
@@ -540,6 +543,56 @@ class _GroupCard extends StatelessWidget {
               ),
             ),
           ),
+        );
+
+        // --- WEB/DESKTOP: Mostrar botón flotante en hover ---
+        if (kIsWeb || Theme.of(context).platform == TargetPlatform.macOS || Theme.of(context).platform == TargetPlatform.windows || Theme.of(context).platform == TargetPlatform.linux) {
+          return MouseRegion(
+            onEnter: (_) => setState(() => _hovering = true),
+            onExit: (_) => setState(() => _hovering = false),
+            child: Stack(
+              children: [
+                cardContent,
+                if (_hovering)
+                  Positioned(
+                    bottom: 24,
+                    right: 24,
+                    child: FloatingActionButton(
+                      heroTag: 'add_expense_${group.id}',
+                      backgroundColor: kPrimaryColor,
+                      mini: true,
+                      onPressed: () => _openAddExpense(context, participants, currency),
+                      child: const Icon(Icons.add, color: Colors.white),
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }
+        // --- MOBILE: Mostrar botón al deslizar (por detrás) ---
+        return Dismissible(
+          key: ValueKey('group_card_${group.id}'),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 32),
+            child: FloatingActionButton(
+              heroTag: 'add_expense_${group.id}',
+              backgroundColor: kPrimaryColor,
+              mini: true,
+              onPressed: () => _openAddExpense(context, participants, currency),
+              child: const Icon(Icons.add, color: Colors.white),
+              shape: const CircleBorder(),
+              elevation: 4,
+            ),
+          ),
+          confirmDismiss: (_) async {
+            _openAddExpense(context, participants, currency);
+            return false; // No eliminar la tarjeta
+          },
+          child: cardContent,
         );
       },
     );
