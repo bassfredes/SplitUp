@@ -25,6 +25,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../screens/add_expense_screen.dart';
 import '../utils/formatters.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final GroupModel group;
@@ -233,6 +234,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       batch.set(docRef, e.toMap());
     }
     await batch.commit();
+    // Registrar evento de Analytics para importación de gastos
+    await FirebaseAnalytics.instance.logEvent(
+      name: 'import_expenses',
+      parameters: {
+        'group_id': group.id,
+        'group_name': group.name,
+        'count': expenses.length,
+      },
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Import completed: ${expenses.length} expenses imported.')),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import '../models/expense_model.dart';
 import '../models/user_model.dart';
 import '../services/firestore_service.dart';
@@ -475,6 +476,14 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
         currency: _currency,
       );
       await firestoreService.addExpense(expense);
+      await FirebaseAnalytics.instance.logEvent(
+        name: 'add_payment',
+        parameters: {
+          'group_id': widget.groupId,
+          'amount': _amountController.text,
+          'currency': _currency,
+        },
+      );
       setState(() => _loading = false);
       if (!mounted) return;
       Navigator.pop(context, expense);

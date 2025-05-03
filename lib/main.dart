@@ -17,6 +17,8 @@ import 'screens/edit_name_screen.dart';
 import 'screens/change_password_screen.dart';
 import 'screens/create_password_screen.dart';
 import 'screens/link_google_screen.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_analytics/observer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +30,9 @@ void main() async {
 
 class SplitUpApp extends StatelessWidget {
   const SplitUpApp({super.key});
+
+  static FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+  static FirebaseAnalyticsObserver observer = FirebaseAnalyticsObserver(analytics: analytics);
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +62,7 @@ class SplitUpApp extends StatelessWidget {
           '/account/create_password': (context) => const CreatePasswordScreen(),
           '/account/link_google': (context) => const LinkGoogleScreen(),
         },
+        navigatorObservers: [observer],
         onGenerateRoute: (settings) {
           // Ruta dinámica para detalle de grupo
           if (settings.name != null && settings.name!.startsWith('/group/')) {

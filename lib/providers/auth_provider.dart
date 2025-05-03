@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -22,6 +23,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _user = await _authService.signInWithGoogle();
+      await FirebaseAnalytics.instance.logEvent(
+        name: 'login',
+        parameters: {'method': 'google'},
+      );
     } catch (e) {
       if (e.toString().contains('popup-closed-by-user') || e.toString().contains('popup_closed')) {
         _loading = false;
@@ -48,6 +53,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _user = await _authService.signInWithEmail(email, password);
+      await FirebaseAnalytics.instance.logEvent(
+        name: 'login',
+        parameters: {'method': 'email'},
+      );
       _loading = false;
       notifyListeners();
       return _user == null ? 'No se pudo iniciar sesión' : null;
@@ -63,6 +72,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _user = await _authService.registerWithEmail(email, password, name: name);
+      await FirebaseAnalytics.instance.logEvent(
+        name: 'sign_up',
+        parameters: {'method': 'email'},
+      );
       _loading = false;
       notifyListeners();
       return _user == null ? 'No se pudo registrar' : null;
@@ -78,6 +91,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _user = await _authService.signInWithGitHub();
+      await FirebaseAnalytics.instance.logEvent(
+        name: 'login',
+        parameters: {'method': 'github'},
+      );
       _loading = false;
       notifyListeners();
       return null;

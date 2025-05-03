@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../config/constants.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -324,9 +325,55 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
     );
   }
 
+  Future<void> _handleSignUpOrLogin({required bool isSignUp}) async {
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() => _error = null);
+      String? error;
+      if (isSignUp) {
+        if (kIsWeb) {
+          final recaptchaKey = '6LfW0yUrAAAAAI7QFs_2qoY7KEHTQvhzIkNnLL13';
+          String? token;
+          try {
+            await GRecaptchaV3.ready(recaptchaKey);
+            token = await GRecaptchaV3.execute(recaptchaKey);
+          } catch (e) {
+            setState(() => _error = 'Error validating reCAPTCHA: $e');
+            return;
+          }
+          if (token == null || token.isEmpty) {
+            setState(() => _error = 'Could not validate reCAPTCHA.');
+            return;
+          }
+        } else {
+          setState(() => _error = 'reCAPTCHA validation is only available on the web version.');
+          return;
+        }
+        // --- END reCAPTCHA ---
+        error = await Provider.of<AuthProvider>(context, listen: false).registerWithEmail(
+          _emailController.text,
+          _passwordController.text,
+          name: _nameController.text.trim(),
+        );
+      } else {
+        final navigator = Navigator.of(context);
+        final scaffoldMessenger = ScaffoldMessenger.of(context);
+        try {
+          await Provider.of<AuthProvider>(context, listen: false).signInWithEmail(_emailController.text, _passwordController.text);
+          navigator.pushReplacementNamed('/dashboard');
+        } on firebase_auth.FirebaseAuthException catch (e) {
+          scaffoldMessenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Unknown error')));
+        } catch (e) {
+          scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        }
+      }
+      if (error != null) {
+        setState(() => _error = error);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     return Form(
       key: _formKey,
       child: Column(
@@ -422,52 +469,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
           ],
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () async {
-              if (_formKey.currentState?.validate() ?? false) {
-                setState(() => _error = null);
-                String? error;
-                if (_isRegister) {
-                  if (kIsWeb) {
-                    final recaptchaKey = '6LfW0yUrAAAAAI7QFs_2qoY7KEHTQvhzIkNnLL13';
-                    String? token;
-                    try {
-                      await GRecaptchaV3.ready(recaptchaKey);
-                      token = await GRecaptchaV3.execute(recaptchaKey);
-                    } catch (e) {
-                      setState(() => _error = 'Error validating reCAPTCHA: $e');
-                      return;
-                    }
-                    if (token == null || token.isEmpty) {
-                      setState(() => _error = 'Could not validate reCAPTCHA.');
-                      return;
-                    }
-                  } else {
-                    setState(() => _error = 'reCAPTCHA validation is only available on the web version.');
-                    return;
-                  }
-                  // --- END reCAPTCHA ---
-                  error = await authProvider.registerWithEmail(
-                    _emailController.text,
-                    _passwordController.text,
-                    name: _nameController.text.trim(),
-                  );
-                } else {
-                  final navigator = Navigator.of(context);
-                  final scaffoldMessenger = ScaffoldMessenger.of(context);
-                  try {
-                    await authProvider.signInWithEmail(_emailController.text, _passwordController.text);
-                    navigator.pushReplacementNamed('/dashboard');
-                  } on firebase_auth.FirebaseAuthException catch (e) {
-                    scaffoldMessenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Unknown error')));
-                  } catch (e) {
-                    scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-                  }
-                }
-                if (error != null) {
-                  setState(() => _error = error);
-                }
-              }
-            },
+            onPressed: () => _handleSignUpOrLogin(isSignUp: _isRegister),
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimaryColor,
               foregroundColor: Colors.white,

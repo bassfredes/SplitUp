@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
@@ -81,13 +82,7 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   Widget _buildBalanceSummary(Map<String, double> balances) {
     if (balances.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Text(
-          'You have no pending balances in any group.',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
-        ),
-      );
+      return const SizedBox.shrink();
     }
     return Card(
       margin: const EdgeInsets.only(bottom: 20),
@@ -114,7 +109,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                   Text(e.key, style: TextStyle(color: Colors.grey[600])),
                 ],
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -466,14 +461,21 @@ class _GroupCard extends StatelessWidget {
                                           const SizedBox(width: 6),
                                           Text(
                                             'Last expense: "${lastDesc ?? ''}"',
-                                            style: const TextStyle(fontSize: 14, color: Colors.grey), // Gray text
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey,
+                                            ), // Gray text
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
                                             formatCurrency(lastAmount ?? 0, lastCurrency ?? group.currency), // Use formatCurrency
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey), // Gray text and normal weight
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 14,
+                                              color: Colors.grey,
+                                            ), // Gray text
                                           ),
                                         ],
                                       ),
@@ -699,6 +701,14 @@ void _showCreateGroupDialog(BuildContext context, String userId) {
                         );
                         try {
                           await groupProvider.createGroup(group, userId);
+                          await FirebaseAnalytics.instance.logEvent(
+                            name: 'join_group',
+                            parameters: {
+                              'group_id': group.id,
+                              'group_name': group.name,
+                              'method': 'manual',
+                            },
+                          );
                           Navigator.pop(dialogContext);
                         } catch (e) {
                           setState(() {
