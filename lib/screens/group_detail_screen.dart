@@ -541,692 +541,700 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           child: SingleChildScrollView(
             controller: scrollController,
             child: Center(
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.95,
-                constraints: const BoxConstraints(maxWidth: 1200),
-                margin: const EdgeInsets.only(top: 20, bottom: 20),
-                padding: const EdgeInsets.all(40),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color.fromRGBO(0, 0, 0, 0.07),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Breadcrumb(
-                      items: [
-                        BreadcrumbItem('Home', route: '/dashboard'),
-                        BreadcrumbItem('Group: ${group.name}'),
-                      ],
-                      onTap: (i) {
-                        if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
-                      },
-                    ),
-                    // --- GROUP PHOTO AND EDIT BUTTON ---
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundColor: Colors.grey[300],
-                          backgroundImage: (group.photoUrl?.isNotEmpty == true)
-                              ? NetworkImage(group.photoUrl!)
-                              : null,
-                          child: (group.photoUrl?.isEmpty != false)
-                              ? const Icon(Icons.group, color: Colors.white, size: 36)
-                              : null,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = constraints.maxWidth < 600;
+                  return Container(
+                    width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
+                    constraints: isMobile ? null : const BoxConstraints(maxWidth: 1200),
+                    margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
+                    padding: EdgeInsets.all(isMobile ? 0 : 40),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.07),
+                          blurRadius: isMobile ? 8 : 24,
+                          offset: const Offset(0, 8),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            group.name,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18), // Espacio interior extra
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Breadcrumb(
+                            items: [
+                              BreadcrumbItem('Home', route: '/dashboard'),
+                              BreadcrumbItem('Group: ${group.name}'),
+                            ],
+                            onTap: (i) {
+                              if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
+                            },
                           ),
-                        ),
-                        FutureBuilder<List<UserModel>>(
-                          future: _participantsFuture,
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting || _participantsLoading) {
-                              return const CircularProgressIndicator();
-                            }
-                            if (snapshot.hasError) {
-                              return const Icon(Icons.error, color: Colors.red);
-                            }
-                            final users = snapshot.data ?? [];
-                            return IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.teal),
-                              tooltip: 'Edit group',
-                              onPressed: () => _showEditGroupDialog(group, users),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    if (group.description != null && group.description!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(group.description!, style: Theme.of(context).textTheme.bodyMedium),
-                    ],
-                    const SizedBox(height: 24),
-                    const Text('Participants:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    FutureBuilder<List<UserModel>>(
-                      // Use the state's Future
-                      future: _participantsFuture,
-                      // Use a key to allow reconstruction if _participantsFuture changes
-                      key: _participantsFutureBuilderKey,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting || _participantsLoading) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        if (snapshot.hasError) {
-                          debugPrint("Error loading participants: ${snapshot.error}");
-                          return const Text('Error loading participants.', style: TextStyle(color: Colors.red));
-                        }
-                        final users = snapshot.data ?? [];
-                        if (users.isEmpty) {
-                          return const Text('No participants');
-                        }
-                        // Save participants to use them elsewhere if necessary
-                        // final List<UserModel> currentParticipants = users;
-                        return Wrap(
-                          spacing: 8,
-                          runSpacing: 4, // Add vertical space
-                          children: users.map((user) => Chip(
-                            avatar: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
-                                ? CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!))
-                                : CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
-                            label: Text(user.name),
-                            onDeleted: () async {
-                              final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                              final isAdmin = group.adminId == authProvider.user?.id;
-                              if (isAdmin && user.id != group.adminId) {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Remove participant'),
-                                    content: Text('Are you sure you want to remove ${user.name}?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                        onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('Remove'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true) {
-                                  setState(() => _participantsLoading = true);
-                                  await Provider.of<GroupProvider>(context, listen: false)
-                                      .removeParticipantAndRedistribute(group.id, user.id);
-                                  await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
-                                    'participantIds': FieldValue.arrayRemove([user.id]),
-                                    'roles': group.roles.where((r) => r['uid'] != user.id).toList(),
-                                  });
-                                  if (!mounted) return;
-                                  setState(() {
-                                    _participantsLoading = false;
-                                  });
-                                  _loadParticipants();
-                                }
-                              }
-                            },
-                          )).toList(),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 32),
-                    // --- ADD EXPENSE BUTTON (ABOVE THE LIST) ---
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FutureBuilder<List<UserModel>>(
-                        // Use the state's Future
-                        future: _participantsFuture,
-                        builder: (context, snapshot) {
-                          // Do not show button while loading or if there is an error
-                          if (snapshot.connectionState != ConnectionState.done || snapshot.hasError || !snapshot.hasData) {
-                             return ElevatedButton.icon(
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add expense'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey, // Visually disabled
-                                  foregroundColor: Colors.white,
+                          // --- GROUP PHOTO AND EDIT BUTTON ---
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 36,
+                                backgroundColor: Colors.grey[300],
+                                backgroundImage: (group.photoUrl?.isNotEmpty == true)
+                                    ? NetworkImage(group.photoUrl!)
+                                    : null,
+                                child: (group.photoUrl?.isEmpty != false)
+                                    ? const Icon(Icons.group, color: Colors.white, size: 36)
+                                    : null,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  group.name,
+                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                                 ),
-                                onPressed: null, // Disabled
-                              );
-                          }
-                          final users = snapshot.data!;
-                          return ElevatedButton.icon(
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add expense'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimaryColor,
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: () async {
-                              // We already have the users from snapshot.data
-                              if (users.isEmpty) {
-                                final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
-                                if (scaffoldMessenger != null) {
-                                  scaffoldMessenger.showSnackBar(
-                                    const SnackBar(content: Text('Could not load group participants.')),
+                              ),
+                              FutureBuilder<List<UserModel>>(
+                                future: _participantsFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting || _participantsLoading) {
+                                    return const CircularProgressIndicator();
+                                  }
+                                  if (snapshot.hasError) {
+                                    return const Icon(Icons.error, color: Colors.red);
+                                  }
+                                  final users = snapshot.data ?? [];
+                                  return IconButton(
+                                    icon: const Icon(Icons.edit, color: Colors.teal),
+                                    tooltip: 'Edit group',
+                                    onPressed: () => _showEditGroupDialog(group, users),
                                   );
-                                }
-                                return;
+                                },
+                              ),
+                            ],
+                          ),
+                          if (group.description != null && group.description!.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(group.description!, style: Theme.of(context).textTheme.bodyMedium),
+                          ],
+                          const SizedBox(height: 24),
+                          const Text('Participants:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          FutureBuilder<List<UserModel>>(
+                            // Use the state's Future
+                            future: _participantsFuture,
+                            // Use a key to allow reconstruction if _participantsFuture changes
+                            key: _participantsFutureBuilderKey,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting || _participantsLoading) {
+                                return const Center(child: CircularProgressIndicator());
                               }
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddExpenseScreen(
-                                    groupId: group.id,
-                                    participants: users,
-                                    currentUserId: Provider.of<AuthProvider>(context, listen: false).user!.id,
-                                    groupCurrency: group.currency,
-                                    groupName: group.name,
-                                  ),
-                                ),
+                              if (snapshot.hasError) {
+                                debugPrint("Error loading participants: ${snapshot.error}");
+                                return const Text('Error loading participants.', style: TextStyle(color: Colors.red));
+                              }
+                              final users = snapshot.data ?? [];
+                              if (users.isEmpty) {
+                                return const Text('No participants');
+                              }
+                              // Save participants to use them elsewhere if necessary
+                              // final List<UserModel> currentParticipants = users;
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 4, // Add vertical space
+                                children: users.map((user) => Chip(
+                                  avatar: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
+                                      ? CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!))
+                                      : CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
+                                  label: Text(user.name),
+                                  onDeleted: () async {
+                                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                                    final isAdmin = group.adminId == authProvider.user?.id;
+                                    if (isAdmin && user.id != group.adminId) {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('Remove participant'),
+                                          content: Text('Are you sure you want to remove ${user.name}?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context, false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                              onPressed: () => Navigator.pop(context, true),
+                                              child: const Text('Remove'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (confirm == true) {
+                                        setState(() => _participantsLoading = true);
+                                        await Provider.of<GroupProvider>(context, listen: false)
+                                            .removeParticipantAndRedistribute(group.id, user.id);
+                                        await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
+                                          'participantIds': FieldValue.arrayRemove([user.id]),
+                                          'roles': group.roles.where((r) => r['uid'] != user.id).toList(),
+                                        });
+                                        if (!mounted) return;
+                                        setState(() {
+                                          _participantsLoading = false;
+                                        });
+                                        _loadParticipants();
+                                      }
+                                    }
+                                  },
+                                )).toList(),
                               );
                             },
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // --- LIST OF EXPENSES GROUPED BY DATE WITH PAGINATION ---
-                    FutureBuilder<List<UserModel>>(
-                      // Use the state's Future
-                      future: _participantsFuture,
-                      builder: (context, userSnapshot) {
-                        if (userSnapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                         if (userSnapshot.hasError) {
-                          debugPrint("Error loading participants for expense list: ${userSnapshot.error}");
-                          return const Text('Error loading user data.', style: TextStyle(color: Colors.red));
-                        }
-                        final users = userSnapshot.data ?? [];
-                        final usersById = {for (var u in users) u.id: u};
-                        final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?.id ?? '';
-                        return StreamBuilder<List<ExpenseModel>>(
-                          stream: _getGroupExpenses(group.id),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-                            final expenses = snapshot.data ?? [];
-                            if (expenses.isEmpty) {
-                              return const Text('No expenses recorded.');
-                            }
-                            // PAGINATION
-                            const int pageSize = 30;
-                            final pageCount = (expenses.length / pageSize).ceil();
-                            int currentPage = 0;
-                            return StatefulBuilder(
-                              builder: (context, setState) {
-                                void goToPage(int page) {
-                                  setState(() {
-                                    currentPage = page;
-                                  });
+                          ),
+                          const SizedBox(height: 32),
+                          // --- ADD EXPENSE BUTTON (ABOVE THE LIST) ---
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FutureBuilder<List<UserModel>>(
+                              // Use the state's Future
+                              future: _participantsFuture,
+                              builder: (context, snapshot) {
+                                // Do not show button while loading or if there is an error
+                                if (snapshot.connectionState != ConnectionState.done || snapshot.hasError || !snapshot.hasData) {
+                                   return ElevatedButton.icon(
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Add expense'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.grey, // Visually disabled
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      onPressed: null, // Disabled
+                                    );
                                 }
-                                final start = currentPage * pageSize;
-                                final end = (start + pageSize > expenses.length) ? expenses.length : start + pageSize;
-                                final pageExpenses = expenses.sublist(start, end);
-                                // Group by date (yyyy-MM-dd)
-                                final Map<String, List<ExpenseModel>> grouped = {};
-                                for (final e in pageExpenses) {
-                                  final key = e.date.toLocal().toString().split(' ')[0];
-                                  grouped.putIfAbsent(key, () => []).add(e);
-                                }
-                                final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ...sortedKeys.map((date) => Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                          child: Text(
-                                            date,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
-                                          ),
-                                        ),
-                                        ...grouped[date]!.map((e) => ExpenseTile(
-                                              expense: e,
-                                              usersById: usersById,
-                                              currentUserId: currentUserId,
-                                              // Pass groupName and usersById to onTap
-                                              onTap: () => _showExpenseDetail(context, e, widget.group.name, usersById),
-                                            )),
-                                      ],
-                                    )),
-                                    const SizedBox(height: 16),
-                                    if (pageCount > 1)
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                        child: Center(
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(Icons.arrow_left),
-                                                onPressed: currentPage > 0 ? () => goToPage(currentPage - 1) : null,
-                                                color: Colors.grey[700],
-                                                splashRadius: 22,
-                                              ),
-                                              ..._buildPaginationButtons(currentPage, pageCount, goToPage),
-                                              IconButton(
-                                                icon: const Icon(Icons.arrow_right),
-                                                onPressed: currentPage < pageCount - 1 ? () => goToPage(currentPage + 1) : null,
-                                                color: Colors.grey[700],
-                                                splashRadius: 22,
-                                              ),
-                                            ],
-                                          ),
+                                final users = snapshot.data!;
+                                return ElevatedButton.icon(
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Add expense'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kPrimaryColor,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () async {
+                                    // We already have the users from snapshot.data
+                                    if (users.isEmpty) {
+                                      final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+                                      if (scaffoldMessenger != null) {
+                                        scaffoldMessenger.showSnackBar(
+                                          const SnackBar(content: Text('Could not load group participants.')),
+                                        );
+                                      }
+                                      return;
+                                    }
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AddExpenseScreen(
+                                          groupId: group.id,
+                                          participants: users,
+                                          currentUserId: Provider.of<AuthProvider>(context, listen: false).user!.id,
+                                          groupCurrency: group.currency,
+                                          groupName: group.name,
                                         ),
                                       ),
-                                  ],
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 32),
-                    // --- BALANCE SUMMARY AND DEBT SIMPLIFICATION (with names) ---
-                    FutureBuilder<List<UserModel>>(
-                      // Use the state's Future
-                      future: _participantsFuture,
-                      builder: (context, userSnapshot) {
-                        if (userSnapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                         if (userSnapshot.hasError) {
-                          debugPrint("Error loading participants for balances: ${userSnapshot.error}");
-                          return const Text('Error loading user data for balances.', style: TextStyle(color: Colors.red));
-                        }
-                        final users = userSnapshot.data ?? [];
-                        final idToName = {for (var u in users) u.id: u.name};
-                        // Get the current user's ID here to use it in the map
-                        final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?.id ?? '';
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          // --- LIST OF EXPENSES GROUPED BY DATE WITH PAGINATION ---
+                          FutureBuilder<List<UserModel>>(
+                            // Use the state's Future
+                            future: _participantsFuture,
+                            builder: (context, userSnapshot) {
+                              if (userSnapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                               if (userSnapshot.hasError) {
+                                debugPrint("Error loading participants for expense list: ${userSnapshot.error}");
+                                return const Text('Error loading user data.', style: TextStyle(color: Colors.red));
+                              }
+                              final users = userSnapshot.data ?? [];
+                              final usersById = {for (var u in users) u.id: u};
+                              final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?.id ?? '';
+                              return StreamBuilder<List<ExpenseModel>>(
+                                stream: _getGroupExpenses(group.id),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: CircularProgressIndicator());
+                                  }
+                                  final expenses = snapshot.data ?? [];
+                                  if (expenses.isEmpty) {
+                                    return const Text('No expenses recorded.');
+                                  }
+                                  // PAGINATION
+                                  const int pageSize = 30;
+                                  final pageCount = (expenses.length / pageSize).ceil();
+                                  int currentPage = 0;
+                                  return StatefulBuilder(
+                                    builder: (context, setState) {
+                                      void goToPage(int page) {
+                                        setState(() {
+                                          currentPage = page;
+                                        });
+                                      }
+                                      final start = currentPage * pageSize;
+                                      final end = (start + pageSize > expenses.length) ? expenses.length : start + pageSize;
+                                      final pageExpenses = expenses.sublist(start, end);
+                                      // Group by date (yyyy-MM-dd)
+                                      final Map<String, List<ExpenseModel>> grouped = {};
+                                      for (final e in pageExpenses) {
+                                        final key = e.date.toLocal().toString().split(' ')[0];
+                                        grouped.putIfAbsent(key, () => []).add(e);
+                                      }
+                                      final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          ...sortedKeys.map((date) => Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                                child: Text(
+                                                  date,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                                                ),
+                                              ),
+                                              ...grouped[date]!.map((e) => ExpenseTile(
+                                                    expense: e,
+                                                    usersById: usersById,
+                                                    currentUserId: currentUserId,
+                                                    // Pass groupName and usersById to onTap
+                                                    onTap: () => _showExpenseDetail(context, e, widget.group.name, usersById),
+                                                  )),
+                                            ],
+                                          )),
+                                          const SizedBox(height: 16),
+                                          if (pageCount > 1)
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                              child: Center(
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    IconButton(
+                                                      icon: const Icon(Icons.arrow_left),
+                                                      onPressed: currentPage > 0 ? () => goToPage(currentPage - 1) : null,
+                                                      color: Colors.grey[700],
+                                                      splashRadius: 22,
+                                                    ),
+                                                    ..._buildPaginationButtons(currentPage, pageCount, goToPage),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.arrow_right),
+                                                      onPressed: currentPage < pageCount - 1 ? () => goToPage(currentPage + 1) : null,
+                                                      color: Colors.grey[700],
+                                                      splashRadius: 22,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 32),
+                          // --- BALANCE SUMMARY AND DEBT SIMPLIFICATION (with names) ---
+                          FutureBuilder<List<UserModel>>(
+                            // Use the state's Future
+                            future: _participantsFuture,
+                            builder: (context, userSnapshot) {
+                              if (userSnapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                               if (userSnapshot.hasError) {
+                                debugPrint("Error loading participants for balances: ${userSnapshot.error}");
+                                return const Text('Error loading user data for balances.', style: TextStyle(color: Colors.red));
+                              }
+                              final users = userSnapshot.data ?? [];
+                              final idToName = {for (var u in users) u.id: u.name};
+                              // Get the current user's ID here to use it in the map
+                              final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?.id ?? '';
 
-                        return StreamBuilder<List<ExpenseModel>>(
-                          stream: _getGroupExpenses(group.id),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-                            final expenses = snapshot.data ?? [];
-                            if (expenses.isEmpty) {
-                              return const Text('No expenses to calculate balances.');
-                            }
-                            // --- TOTALS BY CURRENCY SUMMARY ---
-                            final Map<String, double> totalsByCurrency = {};
-                            for (final e in expenses) {
-                              totalsByCurrency[e.currency] = (totalsByCurrency[e.currency] ?? 0) + e.amount;
-                            }
-                            // --- BALANCE AND DEBT SUMMARY BY CURRENCY ---
-                            final Map<String, List<ExpenseModel>> expensesByCurrency = {};
-                            for (final e in expenses) {
-                              expensesByCurrency.putIfAbsent(e.currency, () => []).add(e);
-                            }
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildTotalsByCurrency(totalsByCurrency),
-                                ...expensesByCurrency.entries.map((entry) {
-                                  final currency = entry.key;
-                                  final currencyExpenses = entry.value;
-                                  final balances = DebtCalculatorService().calculateBalances(currencyExpenses, group);
-                                  final transactions = DebtCalculatorService().simplifyDebts(balances);
+                              return StreamBuilder<List<ExpenseModel>>(
+                                stream: _getGroupExpenses(group.id),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: CircularProgressIndicator());
+                                  }
+                                  final expenses = snapshot.data ?? [];
+                                  if (expenses.isEmpty) {
+                                    return const Text('No expenses to calculate balances.');
+                                  }
+                                  // --- TOTALS BY CURRENCY SUMMARY ---
+                                  final Map<String, double> totalsByCurrency = {};
+                                  for (final e in expenses) {
+                                    totalsByCurrency[e.currency] = (totalsByCurrency[e.currency] ?? 0) + e.amount;
+                                  }
+                                  // --- BALANCE AND DEBT SUMMARY BY CURRENCY ---
+                                  final Map<String, List<ExpenseModel>> expensesByCurrency = {};
+                                  for (final e in expenses) {
+                                    expensesByCurrency.putIfAbsent(e.currency, () => []).add(e);
+                                  }
                                   return Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Balance summary ($currency):', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 8),
-                                      // --- Modification here to highlight current user --- 
-                                      ...balances.entries.map((e) {
-                                        final bool isCurrentUser = e.key == currentUserId; // Check if it is the current user
-                                        final userName = idToName[e.key] ?? e.key;
-                                        final balanceText = '${e.value >= 0 ? "+" : "-"}${formatCurrency(e.value.abs(), currency)}';
-                                        final textColor = e.value > 0 ? Colors.green : (e.value < 0 ? Colors.red : Colors.black);
+                                      _buildTotalsByCurrency(totalsByCurrency),
+                                      ...expensesByCurrency.entries.map((entry) {
+                                        final currency = entry.key;
+                                        final currencyExpenses = entry.value;
+                                        final balances = DebtCalculatorService().calculateBalances(currencyExpenses, group);
+                                        final transactions = DebtCalculatorService().simplifyDebts(balances);
+                                        return Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('Balance summary ($currency):', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            const SizedBox(height: 8),
+                                            // --- Modification here to highlight current user --- 
+                                            ...balances.entries.map((e) {
+                                              final bool isCurrentUser = e.key == currentUserId; // Check if it is the current user
+                                              final userName = idToName[e.key] ?? e.key;
+                                              final balanceText = '${e.value >= 0 ? "+" : "-"}${formatCurrency(e.value.abs(), currency)}';
+                                              final textColor = e.value > 0 ? Colors.green : (e.value < 0 ? Colors.red : Colors.black);
 
-                                        return Container( // Wrap in Container for possible background
-                                          color: isCurrentUser ? const Color.fromRGBO(0, 128, 128, 0.1) : null, // Subtle background if it is the current user
-                                          padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
-                                          child: Text(
-                                            '${isCurrentUser ? '$userName (You)' : userName}: $balanceText',
-                                            style: TextStyle(
-                                              color: textColor,
-                                              // Apply bold if it is the current user
-                                              fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal,
-                                            ),
-                                          ),
+                                              return Container( // Wrap in Container for possible background
+                                                color: isCurrentUser ? const Color.fromRGBO(0, 128, 128, 0.1) : null, // Subtle background if it is the current user
+                                                padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
+                                                child: Text(
+                                                  '${isCurrentUser ? '$userName (You)' : userName}: $balanceText',
+                                                  style: TextStyle(
+                                                    color: textColor,
+                                                    // Apply bold if it is the current user
+                                                    fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal,
+                                                  ),
+                                                ),
+                                              );
+                                            }),
+                                            // --- End Modification ---
+                                            const SizedBox(height: 8),
+                                            Text('Who owes whom ($currency):', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            const SizedBox(height: 8),
+                                            if (transactions.isEmpty)
+                                              const Text('No pending debts.')
+                                            else
+                                              ...transactions.map((t) => Text(
+                                                '${idToName[t['from']] ?? t['from']} owes '
+                                                '${formatCurrency(t['amount'], currency)} to '
+                                                '${idToName[t['to']] ?? t['to']}',
+                                                style: const TextStyle(color: Colors.blueGrey),
+                                              )),
+                                            const SizedBox(height: 16),
+                                          ],
                                         );
                                       }),
-                                      // --- End Modification ---
-                                      const SizedBox(height: 8),
-                                      Text('Who owes whom ($currency):', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 8),
-                                      if (transactions.isEmpty)
-                                        const Text('No pending debts.')
-                                      else
-                                        ...transactions.map((t) => Text(
-                                          '${idToName[t['from']] ?? t['from']} owes '
-                                          '${formatCurrency(t['amount'], currency)} to '
-                                          '${idToName[t['to']] ?? t['to']}',
-                                          style: const TextStyle(color: Colors.blueGrey),
-                                        )),
-                                      const SizedBox(height: 16),
                                     ],
                                   );
-                                }),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 32),
-                    // --- GROUP ACTIONS SECTION ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.person_add),
-                          label: const Text('Invite'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimaryColor,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () async {
-                            setState(() => _participantsLoading = true);
-                            final result = await showDialog(
-                              context: context,
-                              builder: (context) => _InviteParticipantDialog(groupId: group.id),
-                            );
-                            if (!mounted) return;
-                            setState(() => _participantsLoading = false);
-                            if (result == true) {
-                              _loadParticipants(); // Reload the participant list
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    Divider(height: 1, thickness: 1, color: const Color(0xFFE0E0E0)),
-                    const SizedBox(height: 24),
-                    // --- EXPORT/IMPORT SECTION ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.file_download),
-                          label: const Text('Export CSV'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () async {
-                            final users = await _participantsFuture;
-                            if (users == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Waiting for participant data...')),
+                                },
                               );
-                              return;
-                            }
-                            final expensesSnap = await FirebaseFirestore.instance
-                                .collection('groups')
-                                .doc(group.id)
-                                .collection('expenses')
-                                .get();
-                            final expenses = expensesSnap.docs.map((doc) => ExpenseModel.fromMap(doc.data(), doc.id)).toList();
-                            final rows = [
-                              [
-                                'Description', 'Amount', 'Currency', 'Date', 'Payers (email:amount)', 'Participants (emails)', 'Category', 'Recurring', 'Locked'
-                              ],
-                              ...expenses.map((e) => [
-                                e.description,
-                                e.amount.toStringAsFixed(0),
-                                e.currency,
-                                e.date.toIso8601String(),
-                                e.payers.map((p) {
-                                  final email = users.firstWhere((u) => u.id == p['userId'], orElse: () => UserModel(id: '', name: '', email: p['userId'], photoUrl: null)).email;
-                                  final amount = (p['amount'] is double) ? (p['amount'] as double).toInt() : p['amount'];
-                                  return '$email:$amount';
-                                }).join(';'),
-                                e.participantIds.map((id) => users.firstWhere((u) => u.id == id, orElse: () => UserModel(id: '', name: '', email: id, photoUrl: null)).email).join(';'),
-                                e.category ?? '',
-                                e.isRecurring ? 'Yes' : 'No',
-                                e.isLocked ? 'Yes' : 'No',
-                              ])
-                            ];
-                            final csv = const ListToCsvConverter().convert(rows);
-                            final bom = '\uFEFF';
-                            if (kIsWeb) {
-                              // Web: download using dart:html
-                              final bytes = utf8.encode(bom + csv);
-                              final blob = html.Blob([bytes], 'text/csv');
-                              final url = html.Url.createObjectUrlFromBlob(blob);
-                              html.AnchorElement(href: url)
-                                ..download = 'expenses_${group.name}_${DateTime.now().millisecondsSinceEpoch}.csv'
-                                ..click();
-                              html.Url.revokeObjectUrl(url);
-                            } else {
-                              // Desktop/mobile: save to disk
-                              final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-                              final filePath = '${dir.path}/expenses_${group.name}_${DateTime.now().millisecondsSinceEpoch}.csv';
-                              final file = File(filePath);
-                              await file.writeAsString(bom + csv, encoding: utf8);
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('File exported: $filePath')),
-                              );
-                            }
-                          },
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.file_upload),
-                          label: const Text('Import CSV'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () async {
-                            final users = await _participantsFuture;
-                            if (users == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Waiting for participant data...')),
-                              );
-                              return;
-                            }
-                            await _importExpensesFromCsv(users);
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.download, size: 18, color: Colors.blue),
-                        label: const Text(
-                          'Download example CSV',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.blue),
-                          foregroundColor: Colors.blue,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          minimumSize: const Size(0, 32),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        onPressed: () async {
-                          final rows = [
-                            [
-                              'Description', 'Amount', 'Currency', 'Date', 'Payers (email:amount)', 'Participants (emails)', 'Category', 'Recurring', 'Locked'
-                            ],
-                            [
-                              'Example expense',
-                              '10000',
-                              'CLP',
-                              '2025-04-27',
-                              'user1@example.com:10000',
-                              'user1@example.com;user2@example.com',
-                              'Food',
-                              'No',
-                              'No'
-                            ]
-                          ];
-                          final csv = const ListToCsvConverter(fieldDelimiter: ',', eol: '\n', textDelimiter: '"').convert(rows);
-                          if (kIsWeb) {
-                            final bom = [0xEF, 0xBB, 0xBF];
-                            final bytes = [...bom, ...utf8.encode(csv)];
-                            final blob = html.Blob([Uint8List.fromList(bytes)], 'text/csv');
-                            final url = html.Url.createObjectUrlFromBlob(blob);
-                            html.AnchorElement(href: url)
-                              ..download = 'expenses_example_import.csv'
-                              ..click();
-                            html.Url.revokeObjectUrl(url);
-                          } else {
-                            final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-                            final filePath = '${dir.path}/expenses_example_import.csv';
-                            // Use dummy emails in the example file
-                            await File(filePath).writeAsString('\uFEFF$csv', encoding: utf8);
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Example file saved at: $filePath')),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Divider(height: 1, thickness: 1, color: const Color(0xFFE57373)),
-                    const SizedBox(height: 40),
-                    Center(
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Warning! This action is irreversible.',
-                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          Builder(
-                            builder: (context) {
-                              final authProvider = Provider.of<AuthProvider>(context);
-                              final user = authProvider.user;
-                              final loading = authProvider.loading;
-                              final isAdmin = user != null && group.adminId == user.id;
-                              final isOnlyParticipant = user != null && group.participantIds.length == 1 && group.participantIds.first == user.id;
-                              if (loading) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
-                              if (isAdmin || isOnlyParticipant || !Navigator.canPop(context)) {
-                                return ElevatedButton.icon(
-                                  icon: const Icon(Icons.delete),
-                                  label: const Text('Delete group'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                    elevation: 2,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  onPressed: () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Delete group'),
-                                        content: const Text('Are you sure you want to delete this group? This action cannot be undone.'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context, false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                            onPressed: () => Navigator.pop(context, true),
-                                            child: const Text('Delete'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    if (confirm == true && user != null) {
-                                      await Provider.of<GroupProvider>(context, listen: false).deleteGroup(group.id, user.id);
-                                      Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
-                                    }
-                                  },
-                                );
-                              } else if (user != null && group.participantIds.contains(user.id)) {
-                                return ElevatedButton.icon(
-                                  icon: const Icon(Icons.exit_to_app),
-                                  label: const Text('Leave group'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                    elevation: 2,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  onPressed: () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Leave group'),
-                                        content: const Text('Are you sure you want to leave this group?'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context, false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                                            onPressed: () => Navigator.pop(context, true),
-                                            child: const Text('Leave'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    if (confirm == true) {
-                                      await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
-                                        'participantIds': FieldValue.arrayRemove([user.id]),
-                                        'roles': group.roles.where((r) => r['uid'] != user.id).toList(),
-                                      });
-                                      Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
-                                    }
-                                  },
-                                );
-                              }
-                              return const SizedBox.shrink();
                             },
+                          ),
+                          const SizedBox(height: 32),
+                          // --- GROUP ACTIONS SECTION ---
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.person_add),
+                                label: const Text('Invite'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kPrimaryColor,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () async {
+                                  setState(() => _participantsLoading = true);
+                                  final result = await showDialog(
+                                    context: context,
+                                    builder: (context) => _InviteParticipantDialog(groupId: group.id),
+                                  );
+                                  if (!mounted) return;
+                                  setState(() => _participantsLoading = false);
+                                  if (result == true) {
+                                    _loadParticipants(); // Reload the participant list
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 32),
+                          Divider(height: 1, thickness: 1, color: const Color(0xFFE0E0E0)),
+                          const SizedBox(height: 24),
+                          // --- EXPORT/IMPORT SECTION ---
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.file_download),
+                                label: const Text('Export CSV'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () async {
+                                  final users = await _participantsFuture;
+                                  if (users == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Waiting for participant data...')),
+                                    );
+                                    return;
+                                  }
+                                  final expensesSnap = await FirebaseFirestore.instance
+                                      .collection('groups')
+                                      .doc(group.id)
+                                      .collection('expenses')
+                                      .get();
+                                  final expenses = expensesSnap.docs.map((doc) => ExpenseModel.fromMap(doc.data(), doc.id)).toList();
+                                  final rows = [
+                                    [
+                                      'Description', 'Amount', 'Currency', 'Date', 'Payers (email:amount)', 'Participants (emails)', 'Category', 'Recurring', 'Locked'
+                                    ],
+                                    ...expenses.map((e) => [
+                                      e.description,
+                                      e.amount.toStringAsFixed(0),
+                                      e.currency,
+                                      e.date.toIso8601String(),
+                                      e.payers.map((p) {
+                                        final email = users.firstWhere((u) => u.id == p['userId'], orElse: () => UserModel(id: '', name: '', email: p['userId'], photoUrl: null)).email;
+                                        final amount = (p['amount'] is double) ? (p['amount'] as double).toInt() : p['amount'];
+                                        return '$email:$amount';
+                                      }).join(';'),
+                                      e.participantIds.map((id) => users.firstWhere((u) => u.id == id, orElse: () => UserModel(id: '', name: '', email: id, photoUrl: null)).email).join(';'),
+                                      e.category ?? '',
+                                      e.isRecurring ? 'Yes' : 'No',
+                                      e.isLocked ? 'Yes' : 'No',
+                                    ])
+                                  ];
+                                  final csv = const ListToCsvConverter().convert(rows);
+                                  final bom = '\uFEFF';
+                                  if (kIsWeb) {
+                                    // Web: download using dart:html
+                                    final bytes = utf8.encode(bom + csv);
+                                    final blob = html.Blob([bytes], 'text/csv');
+                                    final url = html.Url.createObjectUrlFromBlob(blob);
+                                    html.AnchorElement(href: url)
+                                      ..download = 'expenses_${group.name}_${DateTime.now().millisecondsSinceEpoch}.csv'
+                                      ..click();
+                                    html.Url.revokeObjectUrl(url);
+                                  } else {
+                                    // Desktop/mobile: save to disk
+                                    final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+                                    final filePath = '${dir.path}/expenses_${group.name}_${DateTime.now().millisecondsSinceEpoch}.csv';
+                                    final file = File(filePath);
+                                    await file.writeAsString(bom + csv, encoding: utf8);
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('File exported: $filePath')),
+                                    );
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.file_upload),
+                                label: const Text('Import CSV'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () async {
+                                  final users = await _participantsFuture;
+                                  if (users == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Waiting for participant data...')),
+                                    );
+                                    return;
+                                  }
+                                  await _importExpensesFromCsv(users);
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.download, size: 18, color: Colors.blue),
+                              label: const Text(
+                                'Download example CSV',
+                                style: TextStyle(
+                                  color: Colors.blue,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.blue),
+                                foregroundColor: Colors.blue,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                minimumSize: const Size(0, 32),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              onPressed: () async {
+                                final rows = [
+                                  [
+                                    'Description', 'Amount', 'Currency', 'Date', 'Payers (email:amount)', 'Participants (emails)', 'Category', 'Recurring', 'Locked'
+                                  ],
+                                  [
+                                    'Example expense',
+                                    '10000',
+                                    'CLP',
+                                    '2025-04-27',
+                                    'user1@example.com:10000',
+                                    'user1@example.com;user2@example.com',
+                                    'Food',
+                                    'No',
+                                    'No'
+                                  ]
+                                ];
+                                final csv = const ListToCsvConverter(fieldDelimiter: ',', eol: '\n', textDelimiter: '"').convert(rows);
+                                if (kIsWeb) {
+                                  final bom = [0xEF, 0xBB, 0xBF];
+                                  final bytes = [...bom, ...utf8.encode(csv)];
+                                  final blob = html.Blob([Uint8List.fromList(bytes)], 'text/csv');
+                                  final url = html.Url.createObjectUrlFromBlob(blob);
+                                  html.AnchorElement(href: url)
+                                    ..download = 'expenses_example_import.csv'
+                                    ..click();
+                                  html.Url.revokeObjectUrl(url);
+                                } else {
+                                  final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+                                  final filePath = '${dir.path}/expenses_example_import.csv';
+                                  // Use dummy emails in the example file
+                                  await File(filePath).writeAsString('\uFEFF$csv', encoding: utf8);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Example file saved at: $filePath')),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          Divider(height: 1, thickness: 1, color: const Color(0xFFE57373)),
+                          const SizedBox(height: 40),
+                          Center(
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'Warning! This action is irreversible.',
+                                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                Builder(
+                                  builder: (context) {
+                                    final authProvider = Provider.of<AuthProvider>(context);
+                                    final user = authProvider.user;
+                                    final loading = authProvider.loading;
+                                    final isAdmin = user != null && group.adminId == user.id;
+                                    final isOnlyParticipant = user != null && group.participantIds.length == 1 && group.participantIds.first == user.id;
+                                    if (loading) {
+                                      return const Center(child: CircularProgressIndicator());
+                                    }
+                                    if (isAdmin || isOnlyParticipant || !Navigator.canPop(context)) {
+                                      return ElevatedButton.icon(
+                                        icon: const Icon(Icons.delete),
+                                        label: const Text('Delete group'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          elevation: 2,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text('Delete group'),
+                                              content: const Text('Are you sure you want to delete this group? This action cannot be undone.'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context, false),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                                  onPressed: () => Navigator.pop(context, true),
+                                                  child: const Text('Delete'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true && user != null) {
+                                            await Provider.of<GroupProvider>(context, listen: false).deleteGroup(group.id, user.id);
+                                            Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+                                          }
+                                        },
+                                      );
+                                    } else if (user != null && group.participantIds.contains(user.id)) {
+                                      return ElevatedButton.icon(
+                                        icon: const Icon(Icons.exit_to_app),
+                                        label: const Text('Leave group'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.orange,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          elevation: 2,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text('Leave group'),
+                                              content: const Text('Are you sure you want to leave this group?'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context, false),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+                                                  onPressed: () => Navigator.pop(context, true),
+                                                  child: const Text('Leave'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true) {
+                                            await FirebaseFirestore.instance.collection('groups').doc(group.id).update({
+                                              'participantIds': FieldValue.arrayRemove([user.id]),
+                                              'roles': group.roles.where((r) => r['uid'] != user.id).toList(),
+                                            });
+                                            Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+                                          }
+                                        },
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),

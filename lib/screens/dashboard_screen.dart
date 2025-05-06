@@ -48,6 +48,24 @@ class _DashboardContentState extends State<_DashboardContent> {
   void initState() {
     super.initState();
     _balancesFuture = _loadBalances();
+    // Escuchar cambios en el provider para recargar balances automáticamente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+      groupProvider.addListener(_onGroupsChanged);
+    });
+  }
+
+  @override
+  void dispose() {
+    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+    groupProvider.removeListener(_onGroupsChanged);
+    super.dispose();
+  }
+
+  void _onGroupsChanged() {
+    setState(() {
+      _balancesFuture = _loadBalances();
+    });
   }
 
   Future<Map<String, double>> _loadBalances() async {
@@ -83,6 +101,7 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   Widget _buildBalanceSummary(Map<String, double> balances) {
+    print('BALANCES DEBUG: ${balances.toString()}'); // DEBUG LOG
     if (balances.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -150,127 +169,135 @@ class _DashboardContentState extends State<_DashboardContent> {
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Center(
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.95,
-                constraints: const BoxConstraints(maxWidth: 1200),
-                margin: const EdgeInsets.only(top: 20, bottom: 20),
-                padding: const EdgeInsets.all(40),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.07),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Breadcrumb(
-                      items: [
-                        BreadcrumbItem('Home'),
-                        BreadcrumbItem('Dashboard'),
-                      ],
-                      onTap: (i) {
-                        if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
-                      },
-                    ),
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 28,
-                          backgroundColor: kPrimaryColor,
-                          backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
-                              ? NetworkImage(user.photoUrl!)
-                              : null,
-                          child: (user.photoUrl == null || user.photoUrl!.isEmpty)
-                              ? Text(
-                                  user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                                  style: const TextStyle(fontSize: 28, color: Colors.white),
-                                )
-                              : null,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = constraints.maxWidth < 600;
+                  return Container(
+                    width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
+                    constraints: isMobile ? null : const BoxConstraints(maxWidth: 1200),
+                    margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
+                    padding: EdgeInsets.all(isMobile ? 0 : 40),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.07),
+                          blurRadius: isMobile ? 8 : 24,
+                          offset: const Offset(0, 8),
                         ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18), // Espacio interior extra
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Breadcrumb(
+                            items: [
+                              BreadcrumbItem('Home'),
+                              BreadcrumbItem('Dashboard'),
+                            ],
+                            onTap: (i) {
+                              if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
+                            },
+                          ),
+                          Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                user.name,
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                              CircleAvatar(
+                                radius: isMobile ? 20 : 28,
+                                backgroundColor: kPrimaryColor,
+                                backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
+                                    ? NetworkImage(user.photoUrl!)
+                                    : null,
+                                child: (user.photoUrl == null || user.photoUrl!.isEmpty)
+                                    ? Text(
+                                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                                        style: TextStyle(fontSize: isMobile ? 18 : 28, color: Colors.white),
+                                      )
+                                    : null,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                user.email,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
+                              SizedBox(width: isMobile ? 10 : 20),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.name,
+                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: isMobile ? 18 : null),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      user.email,
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700], fontSize: isMobile ? 13 : null),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    // --- BALANCE SUMMARY ---
-                    FutureBuilder<Map<String, double>>(
-                      future: _balancesFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        if (snapshot.hasError) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Text('Error loading balances', style: TextStyle(color: Colors.red[700])),
-                          );
-                        }
-                        return _buildBalanceSummary(snapshot.data ?? {});
-                      },
-                    ),
-                    // --- END BALANCE SUMMARY ---
-                    Text(
-                      'Your groups',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: kPrimaryColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 26,
+                          SizedBox(height: isMobile ? 18 : 32),
+                          // --- BALANCE SUMMARY ---
+                          FutureBuilder<Map<String, double>>(
+                            future: _balancesFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(child: CircularProgressIndicator()),
+                                );
+                              }
+                              if (snapshot.hasError) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  child: Text('Error loading balances', style: TextStyle(color: Colors.red[700])),
+                                );
+                              }
+                              return _buildBalanceSummary(snapshot.data ?? {});
+                            },
+                          ),
+                          // --- END BALANCE SUMMARY ---
+                          Text(
+                            'Your groups',
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              color: kPrimaryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 26,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Here you can view and manage all your shared expense groups.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
+                          ),
+                          const SizedBox(height: 16),
+                          if (groupProvider.loading)
+                            const Center(child: CircularProgressIndicator())
+                          else if (groupProvider.groups.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 32),
+                              child: Text(
+                                'You have no groups yet. Create a new one!',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
+                              ),
+                            )
+                          else
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: groupProvider.groups.length,
+                              itemBuilder: (context, index) {
+                                final g = groupProvider.groups[index];
+                                return _GroupCard(group: g, currentUserId: user.id);
+                              },
+                            ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Here you can view and manage all your shared expense groups.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 16),
-                    if (groupProvider.loading)
-                      const Center(child: CircularProgressIndicator())
-                    else if (groupProvider.groups.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 32),
-                        child: Text(
-                          'You have no groups yet. Create a new one!',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
-                        ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: groupProvider.groups.length,
-                        itemBuilder: (context, index) {
-                          final g = groupProvider.groups[index];
-                          return _GroupCard(group: g, currentUserId: user.id);
-                        },
-                      ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -453,80 +480,84 @@ class _GroupCardState extends State<_GroupCard> {
                                       );
                                     },
                                   ),
-                                  // Last expense (description and value together, left aligned)
-                                  if (lastExpense != null)
-                                    Padding( // Add padding for vertical spacing
-                                      padding: const EdgeInsets.only(bottom: 4.0), // Space below this line
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.receipt_long, size: 16, color: Colors.grey), // Gray and smaller icon
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Last expense: "${lastExpense.description}"',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey,
-                                            ), // Gray text
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            formatCurrency(lastExpense.amount, lastExpense.currency), // Use formatCurrency
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 14,
-                                              color: Colors.grey,
-                                            ), // Gray text
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                  // Último gasto (descripción y valor juntos, alineados a la izquierda)
                                   if (lastExpense != null)
                                     Padding(
-                                      padding: const EdgeInsets.only(top: 0), // Set top padding to 0
-                                      child: Row(
+                                      padding: const EdgeInsets.only(bottom: 4.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(Icons.person, size: 16, color: Colors.grey),
-                                          const SizedBox(width: 4),
-                                          // Logic to show the name:
-                                          if (participantsMap[lastExpense.createdBy]?.name != null)
-                                            // If found in the current participants map, show it
-                                            Text(
-                                              'by ${participantsMap[lastExpense.createdBy]?.name}',
-                                              style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                            )
-                                          else if (lastExpense.createdBy.isNotEmpty)
-                                            // If not in the map but we have the ID, fetch it with FutureBuilder
-                                            FutureBuilder<DocumentSnapshot>(
-                                              future: FirebaseFirestore.instance.collection('users').doc(lastExpense.createdBy).get(),
-                                              builder: (context, userSnap) {
-                                                String name = 'Someone'; // Default
-                                                if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
-                                                  final data = userSnap.data!.data() as Map<String, dynamic>;
-                                                  name = data['name'] ?? 'Someone';
-                                                } else if (userSnap.connectionState == ConnectionState.waiting) {
-                                                  name = '...'; // Placeholder while loading
-                                                }
-                                                return Text(
-                                                  'by $name',
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  'Last expense: "${lastExpense.description}"',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                formatCurrency(lastExpense.amount, lastExpense.currency),
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  fontSize: 14,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.person, size: 15, color: Colors.grey),
+                                              const SizedBox(width: 4),
+                                              if (participantsMap[lastExpense.createdBy]?.name != null)
+                                                Text(
+                                                  'by ${participantsMap[lastExpense.createdBy]?.name}',
                                                   style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                                );
-                                              },
-                                            )
-                                          else
-                                            // If no valid ID, show "Someone"
-                                            const Text(
-                                              'by Someone',
-                                              style: TextStyle(fontSize: 13, color: Colors.grey),
-                                            ),
-                                          const SizedBox(width: 12),
-                                          const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            formatDateShort(lastExpense.date), // Use formatDateShort
-                                            style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                                )
+                                              else if (lastExpense.createdBy.isNotEmpty)
+                                                FutureBuilder<DocumentSnapshot>(
+                                                  future: FirebaseFirestore.instance.collection('users').doc(lastExpense.createdBy).get(),
+                                                  builder: (context, userSnap) {
+                                                    String name = 'Someone';
+                                                    if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
+                                                      final data = userSnap.data!.data() as Map<String, dynamic>;
+                                                      name = data['name'] ?? 'Someone';
+                                                    } else if (userSnap.connectionState == ConnectionState.waiting) {
+                                                      name = '...';
+                                                    }
+                                                    return Text(
+                                                      'by $name',
+                                                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                                    );
+                                                  },
+                                                )
+                                              else
+                                                const Text(
+                                                  'by Someone',
+                                                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                formatDateShort(lastExpense.date),
+                                                style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),

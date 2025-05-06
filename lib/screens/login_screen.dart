@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../config/constants.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});

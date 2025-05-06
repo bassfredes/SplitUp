@@ -127,116 +127,124 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                         child: Text('Expense not found.'),
                       )
                     : Center(
-                        child: Container(
-                          width: MediaQuery.of(context).size.width * 0.95,
-                          constraints: const BoxConstraints(maxWidth: 1200),
-                          margin: const EdgeInsets.only(top: 20, bottom: 20),
-                          padding: const EdgeInsets.all(40),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color.fromRGBO(0, 0, 0, 0.07),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Breadcrumb(
-                                items: [
-                                  BreadcrumbItem('Home', route: '/dashboard'),
-                                  // Use the received groupName
-                                  BreadcrumbItem(groupName != null ? 'Group: $groupName' : 'Group', route: '/group/${widget.groupId}'),
-                                  BreadcrumbItem(expense != null ? expense!.description : 'Expense'),
-                                ],
-                                onTap: (i) {
-                                  if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
-                                  if (i == 1) Navigator.pushReplacementNamed(context, '/group/${widget.groupId}');
-                                },
-                              ),
-                              const SizedBox(height: 32),
-                              Text(
-                                expense!.description,
-                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  const Text('Amount: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  // Use the formatCurrency function
-                                  Text(formatCurrency(expense!.amount, expense!.currency)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Text('Date: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Text('${expense!.date.toLocal()}'.split(' ')[0]),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Text('Category: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Text(expense!.category ?? '-'),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              const Text('Participants:', style: TextStyle(fontWeight: FontWeight.bold)),
-                              // Use _getUserName which now uses the map
-                              ...expense!.participantIds.map((id) => Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2),
-                                    child: Text(_getUserName(id)),
-                                  )),
-                              const SizedBox(height: 16),
-                              const Text('Payers:', style: TextStyle(fontWeight: FontWeight.bold)),
-                              // Use _getUserName which now uses the map
-                              ...expense!.payers.map((p) => Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2),
-                                    child: Text('${_getUserName(p['userId'])}: ${formatCurrency((p['amount'] as num).toDouble(), expense!.currency)}'),
-                                  )),
-                              const SizedBox(height: 16),
-                              if (expense!.attachments != null && expense!.attachments!.isNotEmpty)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Attachments:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    ...expense!.attachments!.map((a) => Text(a)),
-                                    const SizedBox(height: 16),
-                                  ],
-                                ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  ElevatedButton.icon(
-                                    icon: const Icon(Icons.edit),
-                                    label: const Text('Edit'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.teal,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    onPressed: () {
-                                      // Ensure to pass the participants map to the edit screen
-                                      Navigator.pushNamed(
-                                        context,
-                                        '/group/${widget.groupId}/expense/${widget.expenseId}/edit',
-                                        arguments: {
-                                          'expense': expense,
-                                          'participantsMap': participantsMap, // Pass the map
-                                          'groupId': widget.groupId,
-                                          'groupName': groupName, // Also pass the group name
-                                        },
-                                      );
-                                    },
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isMobile = constraints.maxWidth < 600;
+                            return Container(
+                              width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
+                              constraints: isMobile ? null : const BoxConstraints(maxWidth: 1200),
+                              margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
+                              padding: EdgeInsets.all(isMobile ? 0 : 40),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.07),
+                                    blurRadius: isMobile ? 8 : 24,
+                                    offset: const Offset(0, 8),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(18), // Espacio interior extra
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Breadcrumb(
+                                      items: [
+                                        BreadcrumbItem('Home', route: '/dashboard'),
+                                        // Use the received groupName
+                                        BreadcrumbItem(groupName != null ? 'Group: $groupName' : 'Group', route: '/group/${widget.groupId}'),
+                                        BreadcrumbItem(expense != null ? expense!.description : 'Expense'),
+                                      ],
+                                      onTap: (i) {
+                                        if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
+                                        if (i == 1) Navigator.pushReplacementNamed(context, '/group/${widget.groupId}');
+                                      },
+                                    ),
+                                    const SizedBox(height: 32),
+                                    Text(
+                                      expense!.description,
+                                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      children: [
+                                        const Text('Amount: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        // Use the formatCurrency function
+                                        Text(formatCurrency(expense!.amount, expense!.currency)),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        const Text('Date: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        Text('${expense!.date.toLocal()}'.split(' ')[0]),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        const Text('Category: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        Text(expense!.category ?? '-'),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text('Participants:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    // Use _getUserName which now uses the map
+                                    ...expense!.participantIds.map((id) => Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 2),
+                                          child: Text(_getUserName(id)),
+                                        )),
+                                    const SizedBox(height: 16),
+                                    const Text('Payers:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    // Use _getUserName which now uses the map
+                                    ...expense!.payers.map((p) => Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 2),
+                                          child: Text('${_getUserName(p['userId'])}: ${formatCurrency((p['amount'] as num).toDouble(), expense!.currency)}'),
+                                        )),
+                                    const SizedBox(height: 16),
+                                    if (expense!.attachments != null && expense!.attachments!.isNotEmpty)
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Attachments:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          ...expense!.attachments!.map((a) => Text(a)),
+                                          const SizedBox(height: 16),
+                                        ],
+                                      ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        ElevatedButton.icon(
+                                          icon: const Icon(Icons.edit),
+                                          label: const Text('Edit'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.teal,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: () {
+                                            // Ensure to pass the participants map to the edit screen
+                                            Navigator.pushNamed(
+                                              context,
+                                              '/group/${widget.groupId}/expense/${widget.expenseId}/edit',
+                                              arguments: {
+                                                'expense': expense,
+                                                'participantsMap': participantsMap, // Pass the map
+                                                'groupId': widget.groupId,
+                                                'groupName': groupName, // Also pass the group name
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
       ),
