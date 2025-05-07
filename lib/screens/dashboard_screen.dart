@@ -480,86 +480,141 @@ class _GroupCardState extends State<_GroupCard> {
                                       );
                                     },
                                   ),
-                                  // Último gasto (descripción y valor juntos, alineados a la izquierda)
+                                  // Último gasto (diferente para mobile y desktop)
                                   if (lastExpense != null)
                                     Padding(
                                       padding: const EdgeInsets.only(bottom: 4.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
-                                              const SizedBox(width: 6),
-                                              Expanded(
-                                                child: Text(
-                                                  'Last expense: "${lastExpense.description}"',
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    color: Colors.grey,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                      child: LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final isMobile = constraints.maxWidth < 600;
+                                          if (isMobile) {
+                                            // MOBILE: líneas separadas
+                                            return Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
+                                                    const SizedBox(width: 6),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'Last expense: "${lastExpense.description}"',
+                                                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      formatCurrency(lastExpense.amount, lastExpense.currency),
+                                                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.grey),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                formatCurrency(lastExpense.amount, lastExpense.currency),
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 14,
-                                                  color: Colors.grey,
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.person, size: 15, color: Colors.grey),
+                                                    const SizedBox(width: 4),
+                                                    if (participantsMap[lastExpense.createdBy]?.name != null)
+                                                      Text('by ${participantsMap[lastExpense.createdBy]?.name}', style: const TextStyle(fontSize: 13, color: Colors.grey))
+                                                    else if (lastExpense.createdBy.isNotEmpty)
+                                                      FutureBuilder<DocumentSnapshot>(
+                                                        future: FirebaseFirestore.instance.collection('users').doc(lastExpense.createdBy).get(),
+                                                        builder: (context, userSnap) {
+                                                          String name = 'Someone';
+                                                          if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
+                                                            final data = userSnap.data!.data() as Map<String, dynamic>;
+                                                            name = data['name'] ?? 'Someone';
+                                                          } else if (userSnap.connectionState == ConnectionState.waiting) {
+                                                            name = '...';
+                                                          }
+                                                          return Text('by $name', style: const TextStyle(fontSize: 13, color: Colors.grey));
+                                                        },
+                                                      )
+                                                    else
+                                                      const Text('by Someone', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                                  ],
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.person, size: 15, color: Colors.grey),
-                                              const SizedBox(width: 4),
-                                              if (participantsMap[lastExpense.createdBy]?.name != null)
-                                                Text(
-                                                  'by ${participantsMap[lastExpense.createdBy]?.name}',
-                                                  style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                                )
-                                              else if (lastExpense.createdBy.isNotEmpty)
-                                                FutureBuilder<DocumentSnapshot>(
-                                                  future: FirebaseFirestore.instance.collection('users').doc(lastExpense.createdBy).get(),
-                                                  builder: (context, userSnap) {
-                                                    String name = 'Someone';
-                                                    if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
-                                                      final data = userSnap.data!.data() as Map<String, dynamic>;
-                                                      name = data['name'] ?? 'Someone';
-                                                    } else if (userSnap.connectionState == ConnectionState.waiting) {
-                                                      name = '...';
-                                                    }
-                                                    return Text(
-                                                      'by $name',
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      formatDateShort(lastExpense.date),
                                                       style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                                    );
-                                                  },
-                                                )
-                                              else
-                                                const Text(
-                                                  'by Someone',
-                                                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                                                    ),
+                                                  ],
                                                 ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                formatDateShort(lastExpense.date),
-                                                style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
+                                              ],
+                                            );
+                                          } else {
+                                            // DESKTOP/WEB: cada dato en su línea, como antes
+                                            return Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
+                                                    const SizedBox(width: 6),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'Last expense: "${lastExpense.description}"',
+                                                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      formatCurrency(lastExpense.amount, lastExpense.currency),
+                                                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.grey),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.person, size: 15, color: Colors.grey),
+                                                    const SizedBox(width: 4),
+                                                    if (participantsMap[lastExpense.createdBy]?.name != null)
+                                                      Text('by ${participantsMap[lastExpense.createdBy]?.name}', style: const TextStyle(fontSize: 13, color: Colors.grey))
+                                                    else if (lastExpense.createdBy.isNotEmpty)
+                                                      FutureBuilder<DocumentSnapshot>(
+                                                        future: FirebaseFirestore.instance.collection('users').doc(lastExpense.createdBy).get(),
+                                                        builder: (context, userSnap) {
+                                                          String name = 'Someone';
+                                                          if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
+                                                            final data = userSnap.data!.data() as Map<String, dynamic>;
+                                                            name = data['name'] ?? 'Someone';
+                                                          } else if (userSnap.connectionState == ConnectionState.waiting) {
+                                                            name = '...';
+                                                          }
+                                                          return Text('by $name', style: const TextStyle(fontSize: 13, color: Colors.grey));
+                                                        },
+                                                      )
+                                                    else
+                                                      const Text('by Someone', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      formatDateShort(lastExpense.date),
+                                                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            );
+                                          }
+                                        },
                                       ),
                                     ),
                                 ],
