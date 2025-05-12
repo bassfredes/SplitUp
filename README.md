@@ -17,13 +17,7 @@ SplitUp es una aplicación Flutter para gestionar gastos compartidos y dividir c
 
 ## Capturas de pantalla
 
-### Dashboard (Web/Desktop)
-![Dashboard Desktop](assets/logo/header.png)
-
-### Dashboard (Mobile)
-![Dashboard Mobile](assets/icon/splitup-logo.png)
-
-> Puedes agregar tus propias capturas en la carpeta `assets/` para personalizar este README.
+![Dashboard Desktop](assets/logo/logo-header.png)
 
 ## Instalación y configuración
 1. Clona el repositorio:

@@ -36,7 +36,7 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
                     margin: const EdgeInsets.symmetric(vertical: 5),
                     height: 135,
                     child: Image.asset(
-                    'assets/logo/header.png',
+                    'assets/logo/logo-header.png',
                     fit: BoxFit.contain,
                     ),
                   ),

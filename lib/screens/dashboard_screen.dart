@@ -5,17 +5,14 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
 import '../models/group_model.dart';
 import '../models/expense_model.dart';
 import '../models/user_model.dart';
 import '../config/constants.dart';
-import '../widgets/breadcrumb.dart';
 import '../widgets/header.dart';
 import '../utils/formatters.dart';
-import '../screens/add_expense_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -90,15 +87,6 @@ class _DashboardContentState extends State<_DashboardContent> {
     return totalBalances;
   }
 
-  Future<void> _refreshBalances() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-    final user = authProvider.user!;
-    await groupProvider.loadUserGroups(user.id);
-    setState(() {
-      _balancesFuture = _loadBalances();
-    });
-  }
 
   Widget _buildBalanceSummary(Map<String, double> balances) {
     print('BALANCES DEBUG: ${balances.toString()}'); // DEBUG LOG
@@ -161,146 +149,223 @@ class _DashboardContentState extends State<_DashboardContent> {
         label: const Text('New group', style: TextStyle(color: Colors.white)),
         onPressed: () => _showCreateGroupDialog(context, user.id),
       ),
-      body: Container(
-        width: double.infinity,
-        color: const Color(0xFFF6F8FA),
-        child: RefreshIndicator(
-          onRefresh: _refreshBalances,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Center(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isMobile = constraints.maxWidth < 600;
-                  return Container(
-                    width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
-                    constraints: isMobile ? null : const BoxConstraints(maxWidth: 1200),
-                    margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
-                    padding: EdgeInsets.all(isMobile ? 0 : 40),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.07),
-                          blurRadius: isMobile ? 8 : 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18), // Espacio interior extra
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Breadcrumb(
-                            items: [
-                              BreadcrumbItem('Home'),
-                              BreadcrumbItem('Dashboard'),
-                            ],
-                            onTap: (i) {
-                              if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
-                            },
-                          ),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CircleAvatar(
-                                radius: isMobile ? 20 : 28,
-                                backgroundColor: kPrimaryColor,
-                                backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
-                                    ? NetworkImage(user.photoUrl!)
-                                    : null,
-                                child: (user.photoUrl == null || user.photoUrl!.isEmpty)
-                                    ? Text(
-                                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                                        style: TextStyle(fontSize: isMobile ? 18 : 28, color: Colors.white),
-                                      )
-                                    : null,
-                              ),
-                              SizedBox(width: isMobile ? 10 : 20),
-                              Expanded(
-                                child: Column(
+      body: Center(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
+            return Container(
+              width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
+              constraints: isMobile ? null : const BoxConstraints(maxWidth: 1280),
+              margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
+              padding: EdgeInsets.all(isMobile ? 0 : 32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.07),
+                    blurRadius: isMobile ? 8 : 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 18),
+                      Center(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Información del usuario ahora dentro del contenedor
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 28,
+                                  backgroundColor: Colors.grey[300],
+                                  backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty ? NetworkImage(user.photoUrl!) : null,
+                                  child: (user.photoUrl == null || user.photoUrl!.isEmpty)
+                                      ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 24, color: Colors.white))
+                                      : null,
+                                ),
+                                const SizedBox(width: 18),
+                                Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      user.name,
-                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: isMobile ? 18 : null),
+                                    Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                                    if (user.email.isNotEmpty)
+                                      Text(user.email, style: const TextStyle(color: Colors.grey, fontSize: 15)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            Card(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                              elevation: 0,
+                              color: Colors.white,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 28),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+                                        FutureBuilder<Map<String, double>>(
+                                          future: _balancesFuture,
+                                          builder: (context, snapshot) {
+                                            if (snapshot.connectionState == ConnectionState.waiting) {
+                                              return const Padding(
+                                                padding: EdgeInsets.only(top: 8.0),
+                                                child: CircularProgressIndicator(),
+                                              );
+                                            }
+                                            final balances = snapshot.data ?? {};
+                                            if (balances.isEmpty) {
+                                              return const Padding(
+                                                padding: EdgeInsets.only(top: 8.0),
+                                                child: Text('No balances', style: TextStyle(fontSize: 22, color: Colors.grey)),
+                                              );
+                                            }
+                                            final value = balances.values.first;
+                                            final currency = balances.keys.first;
+                                            final color = value < 0 ? Color(0xFFE14B4B) : Color(0xFF1BC47D);
+                                            return Padding(
+                                              padding: const EdgeInsets.only(top: 8.0),
+                                              child: Text(
+                                                formatCurrency(value, currency),
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 36,
+                                                  color: color,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      user.email,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700], fontSize: isMobile ? 13 : null),
+                                    ElevatedButton(
+                                      onPressed: () {},
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF179D8B),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                        elevation: 0,
+                                      ),
+                                      child: const Text('Settle up', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                          SizedBox(height: isMobile ? 18 : 32),
-                          // --- BALANCE SUMMARY ---
-                          FutureBuilder<Map<String, double>>(
-                            future: _balancesFuture,
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  child: Center(child: CircularProgressIndicator()),
-                                );
-                              }
-                              if (snapshot.hasError) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  child: Text('Error loading balances', style: TextStyle(color: Colors.red[700])),
-                                );
-                              }
-                              return _buildBalanceSummary(snapshot.data ?? {});
-                            },
-                          ),
-                          // --- END BALANCE SUMMARY ---
-                          Text(
-                            'Your groups',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              color: kPrimaryColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 26,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Here you can view and manage all your shared expense groups.',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
-                          ),
-                          const SizedBox(height: 16),
-                          if (groupProvider.loading)
-                            const Center(child: CircularProgressIndicator())
-                          else if (groupProvider.groups.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 32),
-                              child: Text(
-                                'You have no groups yet. Create a new one!',
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
+                            const SizedBox(height: 24),
+                            Card(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                              elevation: 0,
+                              color: Colors.white,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Your groups', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+                                    const SizedBox(height: 16),
+                                    Consumer<GroupProvider>(
+                                      builder: (context, groupProvider, _) {
+                                        if (groupProvider.loading) {
+                                          return const Center(child: CircularProgressIndicator());
+                                        }
+                                        if (groupProvider.groups.isEmpty) {
+                                          return const Text('No groups yet.');
+                                        }
+                                        return Column(
+                                          children: groupProvider.groups.map((group) {
+                                            return _GroupCard(group: group, currentUserId: user.id);
+                                          }).toList(),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
                               ),
-                            )
-                          else
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: groupProvider.groups.length,
-                              itemBuilder: (context, index) {
-                                final g = groupProvider.groups[index];
-                                return _GroupCard(group: g, currentUserId: user.id);
-                              },
                             ),
-                        ],
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: const Color(0xFFE6E6E6)),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 18),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.add, color: Color(0xFF179D8B), size: 32),
+                                        SizedBox(height: 8),
+                                        Text('Add expense', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: const Color(0xFFE6E6E6)),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 18),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.access_time, color: Colors.black, size: 32),
+                                        SizedBox(height: 8),
+                                        Text('Activity', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: const Color(0xFFE6E6E6)),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 18),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.check_circle_outline, color: Colors.black, size: 32),
+                                        SizedBox(height: 8),
+                                        Text('Balances', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -349,19 +414,24 @@ class _GroupCardState extends State<_GroupCard> {
     return { for (var doc in usersSnap.docs) doc.id : UserModel.fromMap(doc.data(), doc.id) };
   }
 
-  void _openAddExpense(BuildContext context, List<UserModel> participants, String currency) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddExpenseScreen(
-          groupId: widget.group.id,
-          participants: participants,
-          currentUserId: widget.currentUserId,
-          groupCurrency: currency,
-          groupName: widget.group.name,
-        ),
-      ),
-    );
+  Future<double> _getUserBalance() async {
+    final expensesSnap = await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.group.id)
+        .collection('expenses')
+        .where('currency', isEqualTo: widget.group.currency)
+        .get();
+    double balance = 0;
+    for (var doc in expensesSnap.docs) {
+      final exp = ExpenseModel.fromMap(doc.data(), doc.id);
+      final paid = exp.payers.where((p) => p['userId'] == widget.currentUserId).fold<double>(0, (a, b) => a + (b['amount'] as num).toDouble());
+      final isParticipant = exp.participantIds.contains(widget.currentUserId);
+      final share = isParticipant
+          ? (exp.splitType == 'equal' ? exp.amount / exp.participantIds.length : _GroupCardState._getUserShare(exp, widget.currentUserId))
+          : 0;
+      balance += paid - share;
+    }
+    return balance;
   }
 
   @override
@@ -374,317 +444,131 @@ class _GroupCardState extends State<_GroupCard> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Card(
-            margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
-            elevation: 3,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: const Padding(padding: EdgeInsets.all(24), child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
           );
         }
         if (snapshot.hasError || !snapshot.hasData) {
           return const SizedBox.shrink();
         }
-        final participantsMap = snapshot.data!['participants'] as Map<String, UserModel>;
         final ExpenseModel? lastExpense = snapshot.data!['lastExpense'];
-        final participants = participantsMap.values.toList();
         final group = widget.group;
         final currency = group.currency;
 
-        Widget cardContent = Card(
-          margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
-          elevation: 3,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          color: const Color(0xFAF8FBFF),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () => Navigator.pushNamed(context, '/group/${group.id}'),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Photo or placeholder
-                  CircleAvatar(
-                    radius: 38,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: (group.photoUrl != null && group.photoUrl!.isNotEmpty)
-                        ? NetworkImage(group.photoUrl!)
-                        : null,
-                    child: (group.photoUrl == null || group.photoUrl!.isEmpty)
-                        ? const Icon(Icons.group, size: 38, color: Colors.grey)
-                        : null,
-                  ),
-                  const SizedBox(width: 24),
-                  // Main info and balance + last expense aligned
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+        return MouseRegion(
+          onEnter: (_) => setState(() => _hovering = true),
+          onExit: (_) => setState(() => _hovering = false),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeInOut,
+            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
+            decoration: BoxDecoration(
+              color: _hovering ? const Color(0xFFF2F7FA) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _hovering ? const Color(0xFF179D8B) : const Color(0xFFE6E6E6), width: 1.5),
+              boxShadow: _hovering
+                  ? [BoxShadow(color: Colors.teal.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]
+                  : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.pushNamed(context, '/group/${group.id}'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: Colors.teal[100],
+                        backgroundImage: (group.photoUrl != null && group.photoUrl!.isNotEmpty)
+                            ? NetworkImage(group.photoUrl!)
+                            : null,
+                        child: (group.photoUrl == null || group.photoUrl!.isEmpty)
+                            ? const Icon(Icons.group, size: 32, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            Text(
+                              group.name,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            FutureBuilder<double>(
+                              future: _getUserBalance(),
+                              builder: (context, balSnap) {
+                                final bal = balSnap.data ?? 0.0;
+                                final color = bal < -0.01
+                                    ? const Color(0xFFE14B4B)
+                                    : (bal > 0.01 ? const Color(0xFF1BC47D) : Colors.grey[700]);
+                                return Text(
+                                  'My balance: ${formatCurrency(bal, currency)}',
+                                  style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 16),
+                                );
+                              },
+                            ),
+                            if (lastExpense != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
+                                  const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    group.name,
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                    'Last expense: "${lastExpense.description}"',
+                                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  if (group.description != null && group.description!.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4, bottom: 8),
-                                      child: Text(
-                                        group.description!,
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  // My balance in a single line
-                                  FutureBuilder<QuerySnapshot>(
-                                    future: FirebaseFirestore.instance
-                                        .collection('groups')
-                                        .doc(group.id)
-                                        .collection('expenses')
-                                        .where('currency', isEqualTo: group.currency)
-                                        .get(),
-                                    builder: (context, snap) {
-                                      double balance = 0;
-                                      String currency = group.currency;
-                                      if (snap.hasData) {
-                                        for (var doc in snap.data!.docs) {
-                                          final exp = ExpenseModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-                                          final paid = exp.payers.where((p) => p['userId'] == widget.currentUserId).fold<double>(0, (a, b) => a + (b['amount'] as num).toDouble());
-                                          final isParticipant = exp.participantIds.contains(widget.currentUserId);
-                                          final share = isParticipant
-                                              ? (exp.splitType == 'equal' ? exp.amount / exp.participantIds.length : _getUserShare(exp, widget.currentUserId))
-                                              : 0;
-                                          balance += paid - share;
-                                        }
-                                      }
-                                      Color color;
-                                      if (balance > 0.01) {
-                                        color = Colors.green;
-                                      } else if (balance < -0.01) {
-                                        color = Colors.red;
-                                      } else {
-                                        color = Colors.grey[600]!;
-                                      }
-                                      String balanceStr = formatCurrency(balance, currency); // Use formatCurrency
-                                      return Padding(
-                                        padding: const EdgeInsets.only(bottom: 8),
-                                        child: Text(
-                                          'My balance: $balanceStr',
-                                          style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 16),
-                                        ),
-                                      );
-                                    },
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '|',
+                                    style: const TextStyle(fontSize: 15, color: Colors.grey),
                                   ),
-                                  // Último gasto (diferente para mobile y desktop)
-                                  if (lastExpense != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 4.0),
-                                      child: LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final isMobile = constraints.maxWidth < 600;
-                                          if (isMobile) {
-                                            // MOBILE: líneas separadas
-                                            return Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
-                                                    const SizedBox(width: 6),
-                                                    Expanded(
-                                                      child: Text(
-                                                        'Last expense: "${lastExpense.description}"',
-                                                        style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      formatCurrency(lastExpense.amount, lastExpense.currency),
-                                                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.grey),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Row(
-                                                  children: [
-                                                    const Icon(Icons.person, size: 15, color: Colors.grey),
-                                                    const SizedBox(width: 4),
-                                                    if (participantsMap[lastExpense.createdBy]?.name != null)
-                                                      Text('by ${participantsMap[lastExpense.createdBy]?.name}', style: const TextStyle(fontSize: 13, color: Colors.grey))
-                                                    else if (lastExpense.createdBy.isNotEmpty)
-                                                      FutureBuilder<DocumentSnapshot>(
-                                                        future: FirebaseFirestore.instance.collection('users').doc(lastExpense.createdBy).get(),
-                                                        builder: (context, userSnap) {
-                                                          String name = 'Someone';
-                                                          if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
-                                                            final data = userSnap.data!.data() as Map<String, dynamic>;
-                                                            name = data['name'] ?? 'Someone';
-                                                          } else if (userSnap.connectionState == ConnectionState.waiting) {
-                                                            name = '...';
-                                                          }
-                                                          return Text('by $name', style: const TextStyle(fontSize: 13, color: Colors.grey));
-                                                        },
-                                                      )
-                                                    else
-                                                      const Text('by Someone', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Row(
-                                                  children: [
-                                                    const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      formatDateShort(lastExpense.date),
-                                                      style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            );
-                                          } else {
-                                            // DESKTOP/WEB: cada dato en su línea, como antes
-                                            return Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
-                                                    const SizedBox(width: 6),
-                                                    Expanded(
-                                                      child: Text(
-                                                        'Last expense: "${lastExpense.description}"',
-                                                        style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      formatCurrency(lastExpense.amount, lastExpense.currency),
-                                                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.grey),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Row(
-                                                  children: [
-                                                    const Icon(Icons.person, size: 15, color: Colors.grey),
-                                                    const SizedBox(width: 4),
-                                                    if (participantsMap[lastExpense.createdBy]?.name != null)
-                                                      Text('by ${participantsMap[lastExpense.createdBy]?.name}', style: const TextStyle(fontSize: 13, color: Colors.grey))
-                                                    else if (lastExpense.createdBy.isNotEmpty)
-                                                      FutureBuilder<DocumentSnapshot>(
-                                                        future: FirebaseFirestore.instance.collection('users').doc(lastExpense.createdBy).get(),
-                                                        builder: (context, userSnap) {
-                                                          String name = 'Someone';
-                                                          if (userSnap.connectionState == ConnectionState.done && userSnap.hasData && userSnap.data!.exists) {
-                                                            final data = userSnap.data!.data() as Map<String, dynamic>;
-                                                            name = data['name'] ?? 'Someone';
-                                                          } else if (userSnap.connectionState == ConnectionState.waiting) {
-                                                            name = '...';
-                                                          }
-                                                          return Text('by $name', style: const TextStyle(fontSize: 13, color: Colors.grey));
-                                                        },
-                                                      )
-                                                    else
-                                                      const Text('by Someone', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Row(
-                                                  children: [
-                                                    const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      formatDateShort(lastExpense.date),
-                                                      style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            );
-                                          }
-                                        },
-                                      ),
-                                    ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    formatCurrency(lastExpense.amount, lastExpense.currency),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF179D8B)),
+                                  ),
                                 ],
                               ),
-                            ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    formatDateShort(lastExpense.date),
+                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
         );
-
-        // --- WEB/DESKTOP: Mostrar botón flotante en hover ---
-        if (kIsWeb || Theme.of(context).platform == TargetPlatform.macOS || Theme.of(context).platform == TargetPlatform.windows || Theme.of(context).platform == TargetPlatform.linux) {
-          return MouseRegion(
-            onEnter: (_) => setState(() => _hovering = true),
-            onExit: (_) => setState(() => _hovering = false),
-            child: Stack(
-              children: [
-                cardContent,
-                if (_hovering)
-                  Positioned(
-                    bottom: 24,
-                    right: 24,
-                    child: FloatingActionButton(
-                      heroTag: 'add_expense_${group.id}',
-                      backgroundColor: kPrimaryColor,
-                      mini: true,
-                      onPressed: () => _openAddExpense(context, participants, currency),
-                      child: const Icon(Icons.add, color: Colors.white),
-                      shape: const CircleBorder(),
-                      elevation: 4,
-                    ),
-                  ),
-              ],
-            ),
-          );
-        }
-        // --- MOBILE: Mostrar botón al deslizar (por detrás) ---
-        return Dismissible(
-          key: ValueKey('group_card_${group.id}'),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 32),
-            child: FloatingActionButton(
-              heroTag: 'add_expense_${group.id}',
-              backgroundColor: kPrimaryColor,
-              mini: true,
-              onPressed: () => _openAddExpense(context, participants, currency),
-              child: const Icon(Icons.add, color: Colors.white),
-              shape: const CircleBorder(),
-              elevation: 4,
-            ),
-          ),
-          confirmDismiss: (_) async {
-            _openAddExpense(context, participants, currency);
-            return false; // No eliminar la tarjeta
-          },
-          child: cardContent,
-        );
       },
     );
   }
-
-  // Helper to get the user's share in an expense
+  // Helper para obtener el share del usuario en un gasto
   static double _getUserShare(ExpenseModel exp, String userId) {
     if (exp.splitType == 'equal') {
       return exp.amount / exp.participantIds.length;

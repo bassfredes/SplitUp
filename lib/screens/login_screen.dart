@@ -403,14 +403,6 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             ),
             validator: (value) => value != null && value.contains('@') ? null : 'Invalid email',
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: _showResetPasswordDialog,
-              style: TextButton.styleFrom(foregroundColor: kPrimaryColor),
-              child: const Text('Forgot your password?'),
-            ),
-          ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _passwordController,
@@ -475,8 +467,15 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text(_isRegister ? 'Sign up' : 'Sign in'),
+            child: Text(_isRegister ? 'Sign up' : 'Log in'),
           ),
+          if (!_isRegister) ...[
+            TextButton(
+              onPressed: _showResetPasswordDialog,
+              style: TextButton.styleFrom(foregroundColor: kPrimaryColor),
+              child: const Text('Forgot your password?'),
+            ),
+          ],
           TextButton(
             onPressed: () {
               setState(() => _isRegister = !_isRegister);
@@ -484,7 +483,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             style: TextButton.styleFrom(
               foregroundColor: kPrimaryColor,
             ),
-            child: Text(_isRegister ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up'),
+            child: Text(_isRegister ? 'Already have an account? Log in' : 'Don\'t have an account? Sign up'),
           ),
         ],
       ),

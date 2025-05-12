@@ -6,9 +6,15 @@ import 'package:intl/intl.dart';
 /// - USD: $12.34 (con 2 decimales)
 /// - EUR: €12.34 (con 2 decimales)
 /// - Otras: $12.34 (con 2 decimales)
+/// 
+/// Para montos negativos, el signo negativo aparece antes del símbolo de la moneda: -$1.234
 String formatCurrency(double amount, String currency) {
   final String symbol;
   final NumberFormat format;
+  final bool isNegative = amount < 0;
+  
+  // Trabajamos con el valor absoluto para el formato
+  final double absAmount = amount.abs();
 
   switch (currency) {
     case 'CLP':
@@ -33,8 +39,9 @@ String formatCurrency(double amount, String currency) {
       break;
   }
 
-  // Construir manualmente la cadena con el símbolo al principio.
-  return '$symbol${format.format(amount)}';
+  // Construir manualmente la cadena con el símbolo al principio,
+  // pero para valores negativos, el signo negativo va antes del símbolo
+  return isNegative ? '-$symbol${format.format(absAmount)}' : '$symbol${format.format(absAmount)}';
 }
 
 /// Formatea una fecha a 'dd MMM' (ej: '2 May').
