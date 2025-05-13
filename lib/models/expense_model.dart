@@ -65,7 +65,7 @@ class ExpenseModel {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'groupId': groupId,
       'description': description,
       'amount': amount,
@@ -73,14 +73,15 @@ class ExpenseModel {
       'participantIds': participantIds,
       'payers': payers,
       'createdBy': createdBy,
-      'category': category,
-      'attachments': attachments,
       'splitType': splitType,
-      'customSplits': customSplits,
       'isRecurring': isRecurring,
-      'recurringRule': recurringRule,
       'isLocked': isLocked,
       'currency': currency,
     };
+    if (category != null) map['category'] = category;
+    if (attachments != null) map['attachments'] = attachments;
+    if (customSplits != null) map['customSplits'] = customSplits;
+    if (recurringRule != null) map['recurringRule'] = recurringRule;
+    return map;
   }
 }

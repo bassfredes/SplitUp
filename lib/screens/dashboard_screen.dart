@@ -13,6 +13,7 @@ import '../models/user_model.dart';
 import '../config/constants.dart';
 import '../widgets/header.dart';
 import '../utils/formatters.dart';
+import '../widgets/app_footer.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -140,6 +141,8 @@ class _DashboardContentState extends State<_DashboardContent> {
           await authProvider.signOut();
           Navigator.pushReplacementNamed(context, '/login');
         },
+        avatarUrl: user.photoUrl,
+        displayName: user.name,
       ),
       backgroundColor: const Color(0xFFF6F8FA),
       floatingActionButton: FloatingActionButton.extended(
@@ -153,217 +156,224 @@ class _DashboardContentState extends State<_DashboardContent> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isMobile = constraints.maxWidth < 600;
-            return Container(
-              width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
-              constraints: isMobile ? null : const BoxConstraints(maxWidth: 1280),
-              margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
-              padding: EdgeInsets.all(isMobile ? 0 : 32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.07),
-                    blurRadius: isMobile ? 8 : 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 18),
-                      Center(
+            return Column(
+              children: [
+                Expanded(
+                  child: Container(
+                    width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
+                    constraints: isMobile ? null : const BoxConstraints(maxWidth: 1280),
+                    margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
+                    padding: EdgeInsets.all(isMobile ? 0 : 32),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.07),
+                          blurRadius: isMobile ? 8 : 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Información del usuario ahora dentro del contenedor
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 28,
-                                  backgroundColor: Colors.grey[300],
-                                  backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty ? NetworkImage(user.photoUrl!) : null,
-                                  child: (user.photoUrl == null || user.photoUrl!.isEmpty)
-                                      ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 24, color: Colors.white))
-                                      : null,
-                                ),
-                                const SizedBox(width: 18),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-                                    if (user.email.isNotEmpty)
-                                      Text(user.email, style: const TextStyle(color: Colors.grey, fontSize: 15)),
-                                  ],
-                                ),
-                              ],
-                            ),
                             const SizedBox(height: 18),
-                            Card(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                              elevation: 0,
-                              color: Colors.white,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 28),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
-                                        FutureBuilder<Map<String, double>>(
-                                          future: _balancesFuture,
-                                          builder: (context, snapshot) {
-                                            if (snapshot.connectionState == ConnectionState.waiting) {
-                                              return const Padding(
-                                                padding: EdgeInsets.only(top: 8.0),
-                                                child: CircularProgressIndicator(),
-                                              );
-                                            }
-                                            final balances = snapshot.data ?? {};
-                                            if (balances.isEmpty) {
-                                              return const Padding(
-                                                padding: EdgeInsets.only(top: 8.0),
-                                                child: Text('No balances', style: TextStyle(fontSize: 22, color: Colors.grey)),
-                                              );
-                                            }
-                                            final value = balances.values.first;
-                                            final currency = balances.keys.first;
-                                            final color = value < 0 ? Color(0xFFE14B4B) : Color(0xFF1BC47D);
-                                            return Padding(
-                                              padding: const EdgeInsets.only(top: 8.0),
-                                              child: Text(
-                                                formatCurrency(value, currency),
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 36,
-                                                  color: color,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () {},
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF179D8B),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                        elevation: 0,
+                            Center(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Información del usuario ahora dentro del contenedor
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor: Colors.grey[300],
+                                        backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty ? NetworkImage(user.photoUrl!) : null,
+                                        child: (user.photoUrl == null || user.photoUrl!.isEmpty)
+                                            ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 24, color: Colors.white))
+                                            : null,
                                       ),
-                                      child: const Text('Settle up', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
+                                      const SizedBox(width: 18),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                                          if (user.email.isNotEmpty)
+                                            Text(user.email, style: const TextStyle(color: Colors.grey, fontSize: 15)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Card(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                    elevation: 0,
+                                    color: Colors.white,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 28),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+                                              FutureBuilder<Map<String, double>>(
+                                                future: _balancesFuture,
+                                                builder: (context, snapshot) {
+                                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                                    return const Padding(
+                                                      padding: EdgeInsets.only(top: 8.0),
+                                                      child: CircularProgressIndicator(),
+                                                    );
+                                                  }
+                                                  final balances = snapshot.data ?? {};
+                                                  if (balances.isEmpty) {
+                                                    return const Padding(
+                                                      padding: EdgeInsets.only(top: 8.0),
+                                                      child: Text('No balances', style: TextStyle(fontSize: 22, color: Colors.grey)),
+                                                    );
+                                                  }
+                                                  final value = balances.values.first;
+                                                  final currency = balances.keys.first;
+                                                  final color = value < 0 ? Color(0xFFE14B4B) : Color(0xFF1BC47D);
+                                                  return Padding(
+                                                    padding: const EdgeInsets.only(top: 8.0),
+                                                    child: Text(
+                                                      formatCurrency(value, currency),
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 36,
+                                                        color: color,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () {},
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF179D8B),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                              elevation: 0,
+                                            ),
+                                            child: const Text('Settle up', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Card(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                    elevation: 0,
+                                    color: Colors.white,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Your groups', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+                                          const SizedBox(height: 16),
+                                          Consumer<GroupProvider>(
+                                            builder: (context, groupProvider, _) {
+                                              if (groupProvider.loading) {
+                                                return const Center(child: CircularProgressIndicator());
+                                              }
+                                              if (groupProvider.groups.isEmpty) {
+                                                return const Text('No groups yet.');
+                                              }
+                                              return Column(
+                                                children: groupProvider.groups.map((group) {
+                                                  return _GroupCard(group: group, currentUserId: user.id);
+                                                }).toList(),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(color: const Color(0xFFE6E6E6)),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 18),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: const [
+                                              Icon(Icons.add, color: Color(0xFF179D8B), size: 32),
+                                              SizedBox(height: 8),
+                                              Text('Add expense', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Container(
+                                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(color: const Color(0xFFE6E6E6)),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 18),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: const [
+                                              Icon(Icons.access_time, color: Colors.black, size: 32),
+                                              SizedBox(height: 8),
+                                              Text('Activity', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Container(
+                                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(color: const Color(0xFFE6E6E6)),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 18),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: const [
+                                              Icon(Icons.check_circle_outline, color: Colors.black, size: 32),
+                                              SizedBox(height: 8),
+                                              Text('Balances', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            Card(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                              elevation: 0,
-                              color: Colors.white,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Your groups', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
-                                    const SizedBox(height: 16),
-                                    Consumer<GroupProvider>(
-                                      builder: (context, groupProvider, _) {
-                                        if (groupProvider.loading) {
-                                          return const Center(child: CircularProgressIndicator());
-                                        }
-                                        if (groupProvider.groups.isEmpty) {
-                                          return const Text('No groups yet.');
-                                        }
-                                        return Column(
-                                          children: groupProvider.groups.map((group) {
-                                            return _GroupCard(group: group, currentUserId: user.id);
-                                          }).toList(),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: const Color(0xFFE6E6E6)),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(vertical: 18),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        Icon(Icons.add, color: Color(0xFF179D8B), size: 32),
-                                        SizedBox(height: 8),
-                                        Text('Add expense', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: const Color(0xFFE6E6E6)),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(vertical: 18),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        Icon(Icons.access_time, color: Colors.black, size: 32),
-                                        SizedBox(height: 8),
-                                        Text('Activity', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: const Color(0xFFE6E6E6)),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(vertical: 18),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        Icon(Icons.check_circle_outline, color: Colors.black, size: 32),
-                                        SizedBox(height: 8),
-                                        Text('Balances', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+                const AppFooter(),
+              ],
             );
           },
         ),

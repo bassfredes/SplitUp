@@ -52,6 +52,10 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.participants.isEmpty) {
+      // Error crítico: no hay participantes
+      print('[ERROR] La lista de participantes está vacía al crear AdvancedAddExpenseScreen');
+    }
     if (widget.expenseToEdit != null) {
       final e = widget.expenseToEdit!;
       _descController.text = e.description;
@@ -410,32 +414,35 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
 
   void _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    // Validación de sumas
+    print('[DEBUG] Iniciando submit de gasto');
     final amount = double.tryParse(_amountController.text) ?? 0.0;
     if (_splitType == 'percent') {
       final totalPercent = _selectedParticipants.fold<double>(0, (sum, id) => sum + (_customSplits[id] ?? 0));
       if ((totalPercent - 100.0).abs() > 0.01) {
+        print('[DEBUG] Error: suma de porcentajes != 100');
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La suma de los porcentajes debe ser 100%')));
         return;
       }
     } else if (_splitType == 'equal' || _splitType == 'custom') {
       final totalSplit = _selectedParticipants.fold<double>(0, (sum, id) => sum + (_customSplits[id] ?? 0));
       if ((totalSplit - amount).abs() > 0.01) {
+        print('[DEBUG] Error: suma de montos != total');
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La suma de los montos debe ser igual al total')));
         return;
       }
     }
     setState(() => _loading = true);
     try {
-      // Transformar payers a List<Map<String, dynamic>>
       final payers = _payerAmounts.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
-      // Transformar customSplits a List<Map<String, dynamic>>?
       final customSplits = _splitType == 'equal'
           ? null
           : _customSplits.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
       final firestoreService = FirestoreService();
+      print('[DEBUG] Datos para Firestore:');
+      print('payers: ' + payers.toString());
+      print('customSplits: ' + (customSplits?.toString() ?? 'null'));
+      print('amount: $amount, currency: $_currency, participantes: $_selectedParticipants');
       if (widget.expenseToEdit != null) {
-        // Modo edición
         final updatedExpense = ExpenseModel(
           id: widget.expenseToEdit!.id,
           groupId: widget.groupId,
@@ -453,12 +460,12 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           isLocked: false,
           currency: _currency,
         );
+        print('[DEBUG] updatedExpense.toMap(): ' + updatedExpense.toMap().toString());
         await firestoreService.updateExpense(updatedExpense);
         setState(() => _loading = false);
         if (!mounted) return;
         Navigator.pop(context, updatedExpense);
       } else {
-        // Guardar en Firestore
         final expense = ExpenseModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           groupId: widget.groupId,
@@ -476,6 +483,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           isLocked: false,
           currency: _currency,
         );
+        print('[DEBUG] expense.toMap(): ' + expense.toMap().toString());
         await firestoreService.addExpense(expense);
         await FirebaseAnalytics.instance.logEvent(
           name: 'add_payment',
@@ -489,10 +497,13 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
         if (!mounted) return;
         Navigator.pop(context, expense);
       }
-    } catch (e) {
+    } catch (e, stack) {
       setState(() => _loading = false);
+      print('Error al guardar el gasto:');
+      print(e);
+      print(stack);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar el gasto: \\n${e.toString()}')),
+        SnackBar(content: Text('Error al guardar el gasto: \n${e.toString()}')),
       );
     }
   }
@@ -541,6 +552,14 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.participants.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Error')), // O usa tu Header
+        body: const Center(
+          child: Text('No se pudo cargar la lista de participantes para el grupo.', style: TextStyle(color: Colors.red, fontSize: 18)),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FA),
       body: SingleChildScrollView(
