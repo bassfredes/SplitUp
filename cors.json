@@ -5,7 +5,8 @@
       "http://localhost",
       "http://127.0.0.1",
       "https://splitup-5972d.web.app",
-      "https://splitup-5972d.firebaseapp.com"
+      "https://splitup-5972d.firebaseapp.com",
+      "https://splitup.bassfredes.dev/"
     ],
     "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
     "maxAgeSeconds": 3600,

@@ -426,67 +426,74 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
       }
     }
     setState(() => _loading = true);
-    // Transformar payers a List<Map<String, dynamic>>
-    final payers = _payerAmounts.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
-    // Transformar customSplits a List<Map<String, dynamic>>?
-    final customSplits = _splitType == 'equal'
-        ? null
-        : _customSplits.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
-    final firestoreService = FirestoreService();
-    if (widget.expenseToEdit != null) {
-      // Modo edición
-      final updatedExpense = ExpenseModel(
-        id: widget.expenseToEdit!.id,
-        groupId: widget.groupId,
-        description: _descController.text.trim(),
-        amount: amount,
-        date: _selectedDate,
-        participantIds: _selectedParticipants,
-        payers: payers,
-        createdBy: widget.currentUserId,
-        category: _selectedCategory ?? _categoryController.text.trim(),
-        attachments: _imagePath != null ? [_imagePath!] : null,
-        splitType: _splitType,
-        customSplits: customSplits,
-        isRecurring: false,
-        isLocked: false,
-        currency: _currency,
-      );
-      await firestoreService.updateExpense(updatedExpense);
+    try {
+      // Transformar payers a List<Map<String, dynamic>>
+      final payers = _payerAmounts.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
+      // Transformar customSplits a List<Map<String, dynamic>>?
+      final customSplits = _splitType == 'equal'
+          ? null
+          : _customSplits.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
+      final firestoreService = FirestoreService();
+      if (widget.expenseToEdit != null) {
+        // Modo edición
+        final updatedExpense = ExpenseModel(
+          id: widget.expenseToEdit!.id,
+          groupId: widget.groupId,
+          description: _descController.text.trim(),
+          amount: amount,
+          date: _selectedDate,
+          participantIds: _selectedParticipants,
+          payers: payers,
+          createdBy: widget.currentUserId,
+          category: _selectedCategory ?? _categoryController.text.trim(),
+          attachments: _imagePath != null ? [_imagePath!] : null,
+          splitType: _splitType,
+          customSplits: customSplits,
+          isRecurring: false,
+          isLocked: false,
+          currency: _currency,
+        );
+        await firestoreService.updateExpense(updatedExpense);
+        setState(() => _loading = false);
+        if (!mounted) return;
+        Navigator.pop(context, updatedExpense);
+      } else {
+        // Guardar en Firestore
+        final expense = ExpenseModel(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          groupId: widget.groupId,
+          description: _descController.text.trim(),
+          amount: amount,
+          date: _selectedDate,
+          participantIds: _selectedParticipants,
+          payers: payers,
+          createdBy: widget.currentUserId,
+          category: _selectedCategory ?? _categoryController.text.trim(),
+          attachments: _imagePath != null ? [_imagePath!] : null,
+          splitType: _splitType,
+          customSplits: customSplits,
+          isRecurring: false,
+          isLocked: false,
+          currency: _currency,
+        );
+        await firestoreService.addExpense(expense);
+        await FirebaseAnalytics.instance.logEvent(
+          name: 'add_payment',
+          parameters: {
+            'group_id': widget.groupId,
+            'amount': _amountController.text,
+            'currency': _currency,
+          },
+        );
+        setState(() => _loading = false);
+        if (!mounted) return;
+        Navigator.pop(context, expense);
+      }
+    } catch (e) {
       setState(() => _loading = false);
-      if (!mounted) return;
-      Navigator.pop(context, updatedExpense);
-    } else {
-      // Guardar en Firestore
-      final expense = ExpenseModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        groupId: widget.groupId,
-        description: _descController.text.trim(),
-        amount: amount,
-        date: _selectedDate,
-        participantIds: _selectedParticipants,
-        payers: payers,
-        createdBy: widget.currentUserId,
-        category: _selectedCategory ?? _categoryController.text.trim(),
-        attachments: _imagePath != null ? [_imagePath!] : null,
-        splitType: _splitType,
-        customSplits: customSplits,
-        isRecurring: false,
-        isLocked: false,
-        currency: _currency,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar el gasto: \\n${e.toString()}')),
       );
-      await firestoreService.addExpense(expense);
-      await FirebaseAnalytics.instance.logEvent(
-        name: 'add_payment',
-        parameters: {
-          'group_id': widget.groupId,
-          'amount': _amountController.text,
-          'currency': _currency,
-        },
-      );
-      setState(() => _loading = false);
-      if (!mounted) return;
-      Navigator.pop(context, expense);
     }
   }
 
