@@ -586,59 +586,119 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           const SizedBox(height: 16),
           _buildParticipantSelector(),
           const SizedBox(height: 28),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _amountController,
-                  decoration: _inputDecoration(label: 'Monto total', hint: _amountPlaceholder),
-                  keyboardType: _currency == 'CLP'
-                      ? TextInputType.number
-                      : const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Monto inválido' : null,
-                  onChanged: (v) {
-                    final formatted = _formatAmountInput(v);
-                    if (v != formatted) {
-                      _amountController.text = formatted;
-                      _amountController.selection = TextSelection.fromPosition(TextPosition(offset: formatted.length));
-                    }
-                    if (_selectedPayer != null) {
-                      setState(() {
-                        _payerAmounts[_selectedPayer!] = double.tryParse(formatted) ?? 0.0;
-                      });
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 56,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _currency,
-                      items: _currencies.map((c) => DropdownMenuItem<String>(
-                        value: c['code'],
-                        child: Row(
-                          children: [
-                            Text(c['icon'] ?? ''),
-                            const SizedBox(width: 4),
-                            Text(c['label'] ?? ''),
-                          ],
-                        ),
-                      )).toList(),
-                      onChanged: (v) => setState(() => _currency = v ?? 'CLP'),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 500;
+              if (isMobile) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _amountController,
+                      decoration: _inputDecoration(label: 'Monto total', hint: _amountPlaceholder),
+                      keyboardType: _currency == 'CLP'
+                          ? TextInputType.number
+                          : const TextInputType.numberWithOptions(decimal: true),
+                      validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Monto inválido' : null,
+                      onChanged: (v) {
+                        final formatted = _formatAmountInput(v);
+                        if (v != formatted) {
+                          _amountController.text = formatted;
+                          _amountController.selection = TextSelection.fromPosition(TextPosition(offset: formatted.length));
+                        }
+                        if (_selectedPayer != null) {
+                          setState(() {
+                            _payerAmounts[_selectedPayer!] = double.tryParse(formatted) ?? 0.0;
+                          });
+                        }
+                      },
                     ),
-                  ),
-                ),
-              ),
-            ],
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 56,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _currency,
+                            items: _currencies.map((c) => DropdownMenuItem<String>(
+                              value: c['code'],
+                              child: Row(
+                                children: [
+                                  Text(c['icon'] ?? ''),
+                                  const SizedBox(width: 4),
+                                  Text(c['label'] ?? ''),
+                                ],
+                              ),
+                            )).toList(),
+                            onChanged: (v) => setState(() => _currency = v ?? 'CLP'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _amountController,
+                        decoration: _inputDecoration(label: 'Monto total', hint: _amountPlaceholder),
+                        keyboardType: _currency == 'CLP'
+                            ? TextInputType.number
+                            : const TextInputType.numberWithOptions(decimal: true),
+                        validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Monto inválido' : null,
+                        onChanged: (v) {
+                          final formatted = _formatAmountInput(v);
+                          if (v != formatted) {
+                            _amountController.text = formatted;
+                            _amountController.selection = TextSelection.fromPosition(TextPosition(offset: formatted.length));
+                          }
+                          if (_selectedPayer != null) {
+                            setState(() {
+                              _payerAmounts[_selectedPayer!] = double.tryParse(formatted) ?? 0.0;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 56,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _currency,
+                            items: _currencies.map((c) => DropdownMenuItem<String>(
+                              value: c['code'],
+                              child: Row(
+                                children: [
+                                  Text(c['icon'] ?? ''),
+                                  const SizedBox(width: 4),
+                                  Text(c['label'] ?? ''),
+                                ],
+                              ),
+                            )).toList(),
+                            onChanged: (v) => setState(() => _currency = v ?? 'CLP'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+            },
           ),
           const SizedBox(height: 28),
           _buildPayers(),

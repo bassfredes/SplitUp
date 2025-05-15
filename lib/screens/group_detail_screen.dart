@@ -556,7 +556,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
                         constraints: isMobile ? null : const BoxConstraints(maxWidth: 1280),
                         margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
-                        padding: EdgeInsets.all(isMobile ? 0 : 40),
+                        padding: EdgeInsets.all(isMobile ? 0 : 32),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
@@ -569,7 +569,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                           ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(18),
+                          padding: EdgeInsets.all(isMobile ? 8 : 18),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [

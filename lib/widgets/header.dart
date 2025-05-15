@@ -25,25 +25,26 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 500;
     return Container(
       color: Colors.white,
       child: SafeArea(
         child: Center(
           child: Container(
-            width: MediaQuery.of(context).size.width * 0.95,
+            width: width * 0.95,
             constraints: const BoxConstraints(maxWidth: 1280),
-            height: kToolbarHeight + 50,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 25),
+            height: isMobile ? 64 : kToolbarHeight + 50,
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 16, vertical: isMobile ? 8 : 25),
             child: Row(
               children: [
-                // Logo con link al dashboard y cursor pointer
                 MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: onDashboard,
                     child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 5),
-                      height: 50,
+                      margin: EdgeInsets.symmetric(vertical: isMobile ? 0 : 5),
+                      height: isMobile ? 32 : 50,
                       child: Image.asset(
                         'assets/logo/logo-header.png',
                         fit: BoxFit.contain,
@@ -51,36 +52,34 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 24),
-                // Flexible space
+                SizedBox(width: isMobile ? 8 : 24),
                 Expanded(child: Container()),
-                // Botón Home (icono)
                 IconButton(
-                  icon: Icon(Icons.home, color: currentRoute == '/dashboard' ? kPrimaryColor : Colors.grey[700]),
+                  icon: Icon(Icons.home, size: isMobile ? 22 : 28, color: currentRoute == '/dashboard' ? kPrimaryColor : Colors.grey[700]),
                   onPressed: onDashboard,
                   tooltip: 'Inicio',
                 ),
-                const SizedBox(width: 8),
+                if (!isMobile) const SizedBox(width: 8),
                 PopupMenuButton<String>(
                   tooltip: 'Cuenta',
                   icon: (avatarUrl != null && avatarUrl!.isNotEmpty)
                     ? CircleAvatar(
                         backgroundImage: NetworkImage(avatarUrl!),
-                        radius: 20,
+                        radius: isMobile ? 16 : 20,
                       )
                     : (displayName != null && displayName!.isNotEmpty)
                       ? CircleAvatar(
                           backgroundColor: Colors.blue[200],
-                          radius: 20,
+                          radius: isMobile ? 16 : 20,
                           child: Text(
                             displayName!.substring(0, 1).toUpperCase(),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: isMobile ? 14 : 16),
                           ),
                         )
                       : CircleAvatar(
                           backgroundColor: Colors.grey[300],
-                          radius: 20,
-                          child: Icon(Icons.person, color: Colors.grey[700]),
+                          radius: isMobile ? 16 : 20,
+                          child: Icon(Icons.person, color: Colors.grey[700], size: isMobile ? 18 : 22),
                         ),
                   onSelected: (value) {
                     if (value == 'account' && onAccount != null) onAccount!();

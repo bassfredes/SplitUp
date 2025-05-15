@@ -140,17 +140,22 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
                 onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
               ),
               Container(
-                width: MediaQuery.of(context).size.width * 0.95,
-                constraints: const BoxConstraints(maxWidth: 1280),
-                margin: const EdgeInsets.only(top: 20, bottom: 20),
-                padding: const EdgeInsets.all(32),
+                width: MediaQuery.of(context).size.width < 600 ? double.infinity : MediaQuery.of(context).size.width * 0.95,
+                constraints: MediaQuery.of(context).size.width < 600 ? null : const BoxConstraints(maxWidth: 1280),
+                margin: EdgeInsets.only(
+                  top: MediaQuery.of(context).size.width < 600 ? 8 : 20,
+                  bottom: MediaQuery.of(context).size.width < 600 ? 8 : 20,
+                  left: MediaQuery.of(context).size.width < 600 ? 10 : 0,
+                  right: MediaQuery.of(context).size.width < 600 ? 10 : 0,
+                ),
+                padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 0 : 32),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(MediaQuery.of(context).size.width < 600 ? 12 : 24),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color.fromRGBO(0, 0, 0, 0.07),
-                      blurRadius: 24,
+                      color: Colors.black.withOpacity(0.07),
+                      blurRadius: MediaQuery.of(context).size.width < 600 ? 8 : 24,
                       offset: const Offset(0, 8),
                     ),
                   ],

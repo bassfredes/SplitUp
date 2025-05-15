@@ -137,7 +137,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(18),
+                      padding: EdgeInsets.all(isMobile ? 8 : 18),
                       child: loading
                           ? const Center(child: CircularProgressIndicator())
                           : error != null

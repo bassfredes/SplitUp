@@ -183,7 +183,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(18),
+                      padding: EdgeInsets.all(isMobile ? 8 : 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -220,60 +220,122 @@ class _DashboardContentState extends State<_DashboardContent> {
                                   elevation: 0,
                                   color: Colors.white,
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 28),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
-                                            FutureBuilder<Map<String, double>>(
-                                              future: _balancesFuture,
-                                              builder: (context, snapshot) {
-                                                if (snapshot.connectionState == ConnectionState.waiting) {
-                                                  return const Padding(
-                                                    padding: EdgeInsets.only(top: 8.0),
-                                                    child: CircularProgressIndicator(),
-                                                  );
-                                                }
-                                                final balances = snapshot.data ?? {};
-                                                if (balances.isEmpty) {
-                                                  return const Padding(
-                                                    padding: EdgeInsets.only(top: 8.0),
-                                                    child: Text('No balances', style: TextStyle(fontSize: 22, color: Colors.grey)),
-                                                  );
-                                                }
-                                                final value = balances.values.first;
-                                                final currency = balances.keys.first;
-                                                final color = value < 0 ? Color(0xFFE14B4B) : Color(0xFF1BC47D);
-                                                return Padding(
-                                                  padding: const EdgeInsets.only(top: 8.0),
-                                                  child: Text(
-                                                    formatCurrency(value, currency),
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 36,
-                                                      color: color,
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: () {},
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF179D8B),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                            elevation: 0,
-                                          ),
-                                          child: const Text('Settle up', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
-                                        ),
-                                      ],
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: isMobile ? 18 : 28,
+                                      horizontal: isMobile ? 8 : 28,
                                     ),
+                                    child: isMobile
+                                        ? Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+                                              FutureBuilder<Map<String, double>>(
+                                                future: _balancesFuture,
+                                                builder: (context, snapshot) {
+                                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                                    return const Padding(
+                                                      padding: EdgeInsets.only(top: 8.0),
+                                                      child: CircularProgressIndicator(),
+                                                    );
+                                                  }
+                                                  final balances = snapshot.data ?? {};
+                                                  if (balances.isEmpty) {
+                                                    return const Padding(
+                                                      padding: EdgeInsets.only(top: 8.0),
+                                                      child: Text('No balances', style: TextStyle(fontSize: 22, color: Colors.grey)),
+                                                    );
+                                                  }
+                                                  final value = balances.values.first;
+                                                  final currency = balances.keys.first;
+                                                  final color = value < 0 ? Color(0xFFE14B4B) : Color(0xFF1BC47D);
+                                                  return Padding(
+                                                    padding: const EdgeInsets.only(top: 8.0),
+                                                    child: Text(
+                                                      formatCurrency(value, currency),
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 36,
+                                                        color: color,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                              const SizedBox(height: 16),
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: ElevatedButton(
+                                                  onPressed: () {},
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: const Color(0xFF179D8B),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                                    elevation: 0,
+                                                  ),
+                                                  child: const Text('Settle up', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        : Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+                                                    FutureBuilder<Map<String, double>>(
+                                                      future: _balancesFuture,
+                                                      builder: (context, snapshot) {
+                                                        if (snapshot.connectionState == ConnectionState.waiting) {
+                                                          return const Padding(
+                                                            padding: EdgeInsets.only(top: 8.0),
+                                                            child: CircularProgressIndicator(),
+                                                          );
+                                                        }
+                                                        final balances = snapshot.data ?? {};
+                                                        if (balances.isEmpty) {
+                                                          return const Padding(
+                                                            padding: EdgeInsets.only(top: 8.0),
+                                                            child: Text('No balances', style: TextStyle(fontSize: 22, color: Colors.grey)),
+                                                          );
+                                                        }
+                                                        final value = balances.values.first;
+                                                        final currency = balances.keys.first;
+                                                        final color = value < 0 ? Color(0xFFE14B4B) : Color(0xFF1BC47D);
+                                                        return Padding(
+                                                          padding: const EdgeInsets.only(top: 8.0),
+                                                          child: Text(
+                                                            formatCurrency(value, currency),
+                                                            style: TextStyle(
+                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: 36,
+                                                              color: color,
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Flexible(
+                                                fit: FlexFit.loose,
+                                                child: ElevatedButton(
+                                                  onPressed: () {},
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: const Color(0xFF179D8B),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                                    elevation: 0,
+                                                  ),
+                                                  child: const Text('Settle up', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(height: 24),
@@ -282,7 +344,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                                   elevation: 0,
                                   color: Colors.white,
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 24,
+                                      horizontal: isMobile ? 12 : 24,
+                                    ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
@@ -306,68 +371,6 @@ class _DashboardContentState extends State<_DashboardContent> {
                                       ],
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: 24),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(horizontal: 6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: const Color(0xFFE6E6E6)),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(vertical: 18),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: const [
-                                            Icon(Icons.add, color: Color(0xFF179D8B), size: 32),
-                                            SizedBox(height: 8),
-                                            Text('Add expense', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(horizontal: 6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: const Color(0xFFE6E6E6)),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(vertical: 18),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: const [
-                                            Icon(Icons.access_time, color: Colors.black, size: 32),
-                                            SizedBox(height: 8),
-                                            Text('Activity', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(horizontal: 6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: const Color(0xFFE6E6E6)),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(vertical: 18),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: const [
-                                            Icon(Icons.check_circle_outline, color: Colors.black, size: 32),
-                                            SizedBox(height: 8),
-                                            Text('Balances', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ],
                             ),
@@ -540,21 +543,26 @@ class _GroupCardState extends State<_GroupCard> {
                                 children: [
                                   const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    'Last expense: "${lastExpense.description}"',
-                                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  Flexible(
+                                    fit: FlexFit.loose,
+                                    child: Text(
+                                      'Last expense: "${lastExpense.description}"',
+                                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    '|',
-                                    style: const TextStyle(fontSize: 15, color: Colors.grey),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    formatCurrency(lastExpense.amount, lastExpense.currency),
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF179D8B)),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('|', style: TextStyle(fontSize: 15, color: Colors.grey)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        formatCurrency(lastExpense.amount, lastExpense.currency),
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF179D8B)),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
