@@ -9,6 +9,7 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onDashboard;
   final String? avatarUrl;
   final String? displayName;
+  final String? email;
 
   const Header({
     super.key,
@@ -19,6 +20,7 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
     this.onDashboard,
     this.avatarUrl,
     this.displayName,
+    this.email,
   });
 
   @override
@@ -86,12 +88,65 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
                   },
                   itemBuilder: (context) => [
                     PopupMenuItem(
+                      enabled: false,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          (avatarUrl != null && avatarUrl!.isNotEmpty)
+                            ? CircleAvatar(backgroundImage: NetworkImage(avatarUrl!), radius: 22)
+                            : (displayName != null && displayName!.isNotEmpty)
+                              ? CircleAvatar(
+                                  backgroundColor: Colors.blue[200],
+                                  radius: 22,
+                                  child: Text(
+                                    displayName!.substring(0, 1).toUpperCase(),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                                  ),
+                                )
+                              : CircleAvatar(
+                                  backgroundColor: Colors.grey[300],
+                                  radius: 22,
+                                  child: Icon(Icons.person, color: Colors.grey[700]),
+                                ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  email ?? '',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
                       value: 'account',
-                      child: Text('My Account'),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.person_outline, size: 20, color: Colors.teal),
+                          SizedBox(width: 10),
+                          Text('My Account'),
+                        ],
+                      ),
                     ),
                     PopupMenuItem(
                       value: 'logout',
-                      child: Text('Logout', style: TextStyle(color: Colors.red[700])),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.logout, size: 20, color: Colors.red),
+                          const SizedBox(width: 10),
+                          Text('Logout', style: TextStyle(color: Colors.red[700])),
+                        ],
+                      ),
                     ),
                   ],
                 ),

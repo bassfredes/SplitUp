@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import '../models/group_model.dart';
 import '../widgets/advanced_add_expense_screen.dart';
 import '../widgets/header.dart';
+import '../widgets/app_footer.dart';
 
 class EditExpenseScreen extends StatefulWidget {
   final String groupId;
@@ -74,44 +75,99 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
   Widget build(BuildContext context) {
     if (loading) {
       return Scaffold(
-        appBar: Header(
-          currentRoute: '/expense_edit',
-          onDashboard: () => Navigator.pushReplacementNamed(context, '/dashboard'),
-          onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
-          onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
-          onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
+        backgroundColor: const Color(0xFFF6F8FA),
+        body: SingleChildScrollView(
+          child: Center(
+            child: Column(
+              children: [
+                Header(
+                  currentRoute: '/expense_edit',
+                  onDashboard: () => Navigator.pushReplacementNamed(context, '/dashboard'),
+                  onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
+                  onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
+                  onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
+                ),
+                const SizedBox(height: 40),
+                const CircularProgressIndicator(),
+                const AppFooter(),
+              ],
+            ),
+          ),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (error != null) {
       return Scaffold(
-        appBar: Header(
-          currentRoute: '/expense_edit',
-          onDashboard: () => Navigator.pushReplacementNamed(context, '/dashboard'),
-          onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
-          onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
-          onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
+        backgroundColor: const Color(0xFFF6F8FA),
+        body: SingleChildScrollView(
+          child: Center(
+            child: Column(
+              children: [
+                Header(
+                  currentRoute: '/expense_edit',
+                  onDashboard: () => Navigator.pushReplacementNamed(context, '/dashboard'),
+                  onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
+                  onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
+                  onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
+                ),
+                const SizedBox(height: 40),
+                Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Text(
+                    error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+                const AppFooter(),
+              ],
+            ),
+          ),
         ),
-        body: Center(child: Text(error!, style: const TextStyle(color: Colors.red))),
       );
     }
     final currentUserId = participants.isNotEmpty ? participants.first.id : '';
     return Scaffold(
-      appBar: Header(
-        currentRoute: '/expense_edit',
-        onDashboard: () => Navigator.pushReplacementNamed(context, '/dashboard'),
-        onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
-        onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
-        onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
-      ),
-      body: AdvancedAddExpenseScreen(
-        groupId: widget.groupId,
-        participants: participants,
-        currentUserId: currentUserId,
-        groupCurrency: expense?.currency ?? 'CLP',
-        expenseToEdit: expense,
-        groupName: group?.name,
+      backgroundColor: const Color(0xFFF6F8FA),
+      body: SingleChildScrollView(
+        child: Center(
+          child: Column(
+            children: [
+              Header(
+                currentRoute: '/expense_edit',
+                onDashboard: () => Navigator.pushReplacementNamed(context, '/dashboard'),
+                onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
+                onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
+                onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
+              ),
+              Container(
+                width: MediaQuery.of(context).size.width * 0.95,
+                constraints: const BoxConstraints(maxWidth: 1280),
+                margin: const EdgeInsets.only(top: 20, bottom: 20),
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color.fromRGBO(0, 0, 0, 0.07),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: AdvancedAddExpenseScreen(
+                  groupId: widget.groupId,
+                  participants: participants,
+                  currentUserId: currentUserId,
+                  groupCurrency: expense?.currency ?? 'CLP',
+                  expenseToEdit: expense,
+                  groupName: group?.name,
+                ),
+              ),
+              const AppFooter(),
+            ],
+          ),
+        ),
       ),
     );
   }

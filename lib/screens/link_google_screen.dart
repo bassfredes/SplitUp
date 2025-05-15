@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../config/constants.dart';
 import '../widgets/header.dart';
+import '../widgets/app_footer.dart';
 
 class LinkGoogleScreen extends StatefulWidget {
   const LinkGoogleScreen({super.key});
@@ -94,51 +95,58 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
         onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
       ),
       backgroundColor: const Color(0xFFF6F8FA),
-      body: Center(
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.95,
-          constraints: const BoxConstraints(maxWidth: 400),
-          margin: const EdgeInsets.only(top: 20, bottom: 20),
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: const Color.fromRGBO(0, 0, 0, 0.07),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(_isLinked ? 'Unlink Google' : 'Link Google', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-              const SizedBox(height: 24),
-              if (_error != null) ...[
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-                const SizedBox(height: 16),
-              ],
-              ElevatedButton.icon(
-                icon: Icon(_isLinked ? Icons.link_off : Icons.link),
-                label: Text(_isLinked ? 'Unlink Google' : 'Link Google'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isLinked ? Colors.red : kPrimaryColor,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      body: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.95,
+                constraints: const BoxConstraints(maxWidth: 400),
+                margin: const EdgeInsets.only(top: 20, bottom: 20),
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color.fromRGBO(0, 0, 0, 0.07),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-                onPressed: _loading
-                    ? null
-                    : _isLinked
-                        ? _unlinkGoogle
-                        : _linkGoogle,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(_isLinked ? 'Unlink Google' : 'Link Google', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                    const SizedBox(height: 24),
+                    if (_error != null) ...[
+                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 16),
+                    ],
+                    ElevatedButton.icon(
+                      icon: Icon(_isLinked ? Icons.link_off : Icons.link),
+                      label: Text(_isLinked ? 'Unlink Google' : 'Link Google'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isLinked ? Colors.red : kPrimaryColor,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _loading
+                          ? null
+                          : _isLinked
+                              ? _unlinkGoogle
+                              : _linkGoogle,
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
-        ),
+          const AppFooter(),
+        ],
       ),
     );
   }
