@@ -19,12 +19,14 @@ import 'screens/create_password_screen.dart';
 import 'screens/link_google_screen.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_analytics/observer.dart';
+import 'config/app_check_init.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await initializeAppCheck(); // Inicializa App Check
   runApp(const SplitUpApp());
 }
 
