@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/expense_model.dart';
 import '../models/user_model.dart';
 import '../config/constants.dart';
+import '../config/category_colors.dart';
 
-class ExpenseTile extends StatelessWidget {
+class ExpenseTile extends StatefulWidget {
   final ExpenseModel expense;
   final Map<String, UserModel> usersById;
   final String currentUserId;
@@ -18,7 +19,17 @@ class ExpenseTile extends StatelessWidget {
   });
 
   @override
+  State<ExpenseTile> createState() => _ExpenseTileState();
+}
+
+class _ExpenseTileState extends State<ExpenseTile> {
+  bool _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
+    final expense = widget.expense;
+    final usersById = widget.usersById;
+    final currentUserId = widget.currentUserId;
     final payerId = expense.payers.isNotEmpty ? expense.payers.first['userId'] as String : expense.createdBy;
     final payer = usersById[payerId];
     final avatar = (payer != null && payer.photoUrl != null && payer.photoUrl!.isNotEmpty)
@@ -32,7 +43,7 @@ class ExpenseTile extends StatelessWidget {
             ),
           );
     final categoryIcon = _getCategoryIcon(expense.category);
-    final textColor = DefaultTextStyle.of(context).style.color;
+    // final textColor = DefaultTextStyle.of(context).style.color;
     double userShare = 0.0;
     if (expense.customSplits != null) {
       final split = expense.customSplits!.firstWhere(
@@ -56,127 +67,104 @@ class ExpenseTile extends StatelessWidget {
     final netLabel = net < 0 ? 'You owe' : (net > 0 ? 'You are owed' : 'Settled');
 
     final isMobile = MediaQuery.of(context).size.width < 600;
+    final categoryColor = getCategoryColor(expense.category ?? 'otros');
+    final borderRadius = BorderRadius.circular(isMobile ? 14 : 18);
+    final padding = EdgeInsets.symmetric(vertical: isMobile ? 12 : 18, horizontal: isMobile ? 12 : 18);
+    final margin = EdgeInsets.symmetric(vertical: isMobile ? 6 : 10, horizontal: 0);
 
-    if (isMobile) {
-      return InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Card(
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          elevation: 2,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    if (categoryIcon != null)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.teal.withOpacity(0.10),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        child: Icon(categoryIcon, color: Colors.teal[700], size: 22),
-                      ),
-                    if (categoryIcon != null) const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _formatAmountWithCurrency(expense.amount, expense.currency),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Color(0xFF179D8B)),
-                      ),
-                    ),
-                    avatar,
-                  ],
+    Widget content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (categoryIcon != null)
+              Container(
+                decoration: BoxDecoration(
+                  color: categoryColor.withOpacity(0.13),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  expense.description,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const Icon(Icons.person, size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Flexible(child: Text('Paid by: ${payer?.name ?? payerId}', style: const TextStyle(fontSize: 14, color: Colors.grey))),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(expense.date.toLocal().toString().split(' ')[0], style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(net < 0 ? Icons.arrow_upward : (net > 0 ? Icons.arrow_downward : Icons.check_circle), size: 16, color: netColor),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        net != 0 ? '$netLabel: ${_formatAmountWithCurrency(net.abs(), expense.currency)}' : 'Settled: ${_formatAmountWithCurrency(0, expense.currency)}',
-                        style: TextStyle(color: netColor, fontWeight: FontWeight.w600, fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                padding: const EdgeInsets.all(8),
+                child: Icon(categoryIcon, color: categoryColor, size: isMobile ? 20 : 22),
+              ),
+            if (categoryIcon != null) const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _formatAmountWithCurrency(expense.amount, expense.currency),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 18 : 22, color: categoryColor),
+              ),
+            ),
+            avatar,
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          expense.description,
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: isMobile ? 14 : 16),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            const Icon(Icons.person, size: 16, color: Colors.grey),
+            const SizedBox(width: 4),
+            Flexible(child: Text('Paid by: ${payer?.name ?? payerId}', style: const TextStyle(fontSize: 14, color: Colors.grey))),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+            const SizedBox(width: 4),
+            Text(expense.date.toLocal().toString().split(' ')[0], style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(net < 0 ? Icons.arrow_upward : (net > 0 ? Icons.arrow_downward : Icons.check_circle), size: 16, color: netColor),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                net != 0 ? '$netLabel: ${_formatAmountWithCurrency(net.abs(), expense.currency)}' : 'Settled: ${_formatAmountWithCurrency(0, expense.currency)}',
+                style: TextStyle(color: netColor, fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        margin: margin,
+        decoration: BoxDecoration(
+          color: _hovering ? categoryColor.withOpacity(0.08) : Colors.white,
+          borderRadius: borderRadius,
+          border: Border.all(
+            color: _hovering ? categoryColor : categoryColor.withOpacity(0.35),
+            width: 1.5,
+          ),
+          boxShadow: _hovering
+              ? [BoxShadow(color: categoryColor.withOpacity(0.13), blurRadius: isMobile ? 8 : 16, offset: const Offset(0, 4))]
+              : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: isMobile ? 4 : 8, offset: const Offset(0, 2))],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: borderRadius,
+            onTap: widget.onTap,
+            child: Padding(
+              padding: padding,
+              child: content,
             ),
           ),
         ),
-      );
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 1,
-      child: ListTile(
-        onTap: onTap,
-        leading: avatar,
-        title: Row(
-          children: [
-            if (categoryIcon != null) ...[
-              Icon(categoryIcon, color: textColor, size: 20),
-              const SizedBox(width: 6),
-            ],
-            Expanded(child: Text(expense.description, style: const TextStyle(fontWeight: FontWeight.bold))),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Paid by: ${payer?.name ?? payerId}'),
-            Text(expense.date.toLocal().toString().split(' ')[0]),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              _formatAmountWithCurrency(expense.amount, expense.currency),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 4),
-            if (net != 0)
-              Text(
-                '$netLabel: ${_formatAmountWithCurrency(net.abs(), expense.currency)}',
-                style: TextStyle(color: netColor, fontWeight: FontWeight.w600, fontSize: 13),
-              )
-            else
-              const Text('Settled: \$ 0', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 13)),
-          ],
-        ),
-        isThreeLine: true,
       ),
     );
   }

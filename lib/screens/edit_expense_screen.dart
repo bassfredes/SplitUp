@@ -139,35 +139,43 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
                 onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
                 onLogout: () => Navigator.pushReplacementNamed(context, '/login'),
               ),
-              Container(
-                width: MediaQuery.of(context).size.width < 600 ? double.infinity : MediaQuery.of(context).size.width * 0.95,
-                constraints: MediaQuery.of(context).size.width < 600 ? null : const BoxConstraints(maxWidth: 1280),
-                margin: EdgeInsets.only(
-                  top: MediaQuery.of(context).size.width < 600 ? 8 : 20,
-                  bottom: MediaQuery.of(context).size.width < 600 ? 8 : 20,
-                  left: MediaQuery.of(context).size.width < 600 ? 10 : 0,
-                  right: MediaQuery.of(context).size.width < 600 ? 10 : 0,
-                ),
-                padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 0 : 32),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(MediaQuery.of(context).size.width < 600 ? 12 : 24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.07),
-                      blurRadius: MediaQuery.of(context).size.width < 600 ? 8 : 24,
-                      offset: const Offset(0, 8),
+              Builder(
+                builder: (context) {
+                  final isMobile = MediaQuery.of(context).size.width < 600;
+                  return Container(
+                    width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
+                    constraints: isMobile ? null : const BoxConstraints(maxWidth: 1280),
+                    margin: EdgeInsets.only(
+                      top: isMobile ? 8 : 20,
+                      bottom: isMobile ? 8 : 20,
+                      left: isMobile ? 10 : 0,
+                      right: isMobile ? 10 : 0,
                     ),
-                  ],
-                ),
-                child: AdvancedAddExpenseScreen(
-                  groupId: widget.groupId,
-                  participants: participants,
-                  currentUserId: currentUserId,
-                  groupCurrency: expense?.currency ?? 'CLP',
-                  expenseToEdit: expense,
-                  groupName: group?.name,
-                ),
+                    padding: EdgeInsets.all(isMobile ? 0 : 32),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.07),
+                          blurRadius: isMobile ? 8 : 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(isMobile ? 8 : 18),
+                      child: AdvancedAddExpenseScreen(
+                        groupId: widget.groupId,
+                        participants: participants,
+                        currentUserId: currentUserId,
+                        groupCurrency: expense?.currency ?? 'CLP',
+                        expenseToEdit: expense,
+                        groupName: group?.name,
+                      ),
+                    ),
+                  );
+                },
               ),
               const AppFooter(),
             ],

@@ -60,7 +60,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(18),
+                      padding: EdgeInsets.all(isMobile ? 8 : 18),
                       child: AdvancedAddExpenseScreen(
                         groupId: widget.groupId,
                         participants: widget.participants,

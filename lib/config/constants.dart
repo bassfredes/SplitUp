@@ -2,20 +2,20 @@ import 'package:flutter/material.dart';
 
 // Categorías compatibles con los gastos
 const List<Map<String, dynamic>> kExpenseCategories = [
-  {'key': 'comida', 'label': 'Comida Rápida', 'icon': 'fastfood'},
-  {'key': 'food', 'label': 'Comida', 'icon': 'restaurant'},
-  {'key': 'transporte', 'label': 'Transporte', 'icon': 'directions_car'},
-  {'key': 'transporte público', 'label': 'Transporte público', 'icon': 'directions_transit'},
+  {'key': 'food', 'label': 'Food', 'icon': 'restaurant'},
+  {'key': 'fast food', 'label': 'Fast Food', 'icon': 'fastfood'},
+  {'key': 'transport', 'label': 'Transport', 'icon': 'directions_car'},
+  {'key': 'public transport', 'label': 'Public Transport', 'icon': 'directions_transit'},
   {'key': 'bus', 'label': 'Bus', 'icon': 'directions_bus'},
   {'key': 'taxi', 'label': 'Taxi', 'icon': 'directions_bus'},
-  {'key': 'hogar', 'label': 'Hogar', 'icon': 'home'},
-  {'key': 'casa', 'label': 'Casa', 'icon': 'home'},
-  {'key': 'ocio', 'label': 'Ocio', 'icon': 'local_play'},
-  {'key': 'entretenimiento', 'label': 'Entretenimiento', 'icon': 'celebration'},
-  {'key': 'viaje', 'label': 'Viaje', 'icon': 'flight'},
-  {'key': 'salud', 'label': 'Salud', 'icon': 'local_hospital'},
-  {'key': 'compras', 'label': 'Compras', 'icon': 'shopping_cart'},
-  {'key': 'otros', 'label': 'Otros', 'icon': 'category'},
+  {'key': 'home', 'label': 'Home', 'icon': 'home'},
+  {'key': 'house', 'label': 'House', 'icon': 'home'},
+  {'key': 'leisure', 'label': 'Leisure', 'icon': 'local_play'},
+  {'key': 'entertainment', 'label': 'Entertainment', 'icon': 'celebration'},
+  {'key': 'travel', 'label': 'Travel', 'icon': 'flight'},
+  {'key': 'health', 'label': 'Health', 'icon': 'local_hospital'},
+  {'key': 'shopping', 'label': 'Shopping', 'icon': 'shopping_cart'},
+  {'key': 'other', 'label': 'Other', 'icon': 'category'},
 ];
 
 // Monedas compatibles con la app

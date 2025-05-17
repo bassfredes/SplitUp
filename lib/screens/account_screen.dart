@@ -53,7 +53,7 @@ class AccountScreen extends StatelessWidget {
                     child: user == null
                         ? const Center(child: CircularProgressIndicator())
                         : Padding(
-                            padding: const EdgeInsets.all(18), // Espacio interior extra
+                            padding: EdgeInsets.all(isMobile ? 8 : 18),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -411,68 +411,25 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               icon: const Icon(Icons.person_add, size: 20),
                               label: const Text('Add', style: TextStyle(fontWeight: FontWeight.w500)),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[100],
-                                foregroundColor: Colors.teal,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
                               onPressed: () async {
-                                final emailController = TextEditingController();
-                                String? error;
-                                await showDialog(
-                                  context: context,
-                                  builder: (contextInner) => StatefulBuilder(
-                                    builder: (contextInner, setStateInner) => AlertDialog(
-                                      title: const Text('Invite participant'),
-                                      content: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          TextField(
-                                            controller: emailController,
-                                            decoration: const InputDecoration(labelText: 'Participant email'),
-                                          ),
-                                          if (error != null)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 8.0),
-                                              child: Text(error!, style: const TextStyle(color: Colors.red)),
-                                            ),
-                                        ],
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(contextInner),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor, foregroundColor: Colors.white),
-                                          onPressed: () async {
-                                            final email = emailController.text.trim();
-                                            final userSnap = await FirebaseFirestore.instance
-                                                .collection('users')
-                                                .where('email', isEqualTo: email)
-                                                .limit(1)
-                                                .get();
-                                            if (userSnap.docs.isEmpty) {
-                                              setStateInner(() => error = 'User not found');
-                                              return;
-                                            }
-                                            final userId = userSnap.docs.first.id;
-                                            if (!participantIds.contains(userId)) {
-                                              setStateDialog(() => participantIds.add(userId));
-                                              if (!participantsMap.containsKey(userId)) {
-                                                final newUser = UserModel.fromMap(userSnap.docs.first.data(), userId);
-                                                setStateDialog(() => participantsMap[userId] = newUser);
-                                              }
-                                            }
-                                            Navigator.pop(contextInner);
-                                          },
-                                          child: const Text('Invite'),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
+                                final UserModel? invitedUser = await _showInviteParticipantDialog();
+                                if (invitedUser != null) {
+                                  if (!participantIds.contains(invitedUser.id)) {
+                                    setStateDialog(() {
+                                      participantIds.add(invitedUser.id);
+                                      participantsMap[invitedUser.id] = invitedUser;
+                                    });
+                                  } else {
+                                    // Verificar si el widget sigue montado antes de mostrar SnackBar
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('${invitedUser.name} is already in the list.')),
+                                      );
+                                    }
+                                  }
+                                }
                               },
                             ),
                           ],
@@ -594,10 +551,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   }
 
   // Invite participant dialog as a method of the class
-  void _showInviteParticipantDialog() async {
+  // MODIFICAR LA FIRMA PARA QUE DEVUELVA Future<UserModel?>
+  Future<UserModel?> _showInviteParticipantDialog() async {
     final emailController = TextEditingController();
     String? error;
-    await showDialog(
+    // USAR showDialog<UserModel> para que pueda devolver un UserModel
+    return await showDialog<UserModel>(
       context: context,
       builder: (contextInner) => StatefulBuilder(
         builder: (contextInner, setStateInner) => AlertDialog(
@@ -608,6 +567,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               TextField(
                 controller: emailController,
                 decoration: const InputDecoration(labelText: 'Participant email'),
+                onChanged: (_) { // Limpiar error cuando el usuario escribe
+                  if (error != null) {
+                    setStateInner(() => error = null);
+                  }
+                },
               ),
               if (error != null)
                 Padding(
@@ -618,28 +582,37 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(contextInner),
+              onPressed: () => Navigator.pop(contextInner, null), // Devolver null al cancelar
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
               onPressed: () async {
                 final email = emailController.text.trim();
+                if (email.isEmpty) {
+                  setStateInner(() => error = 'Email cannot be empty.');
+                  return;
+                }
+                if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(email)) {
+                  setStateInner(() => error = 'Enter a valid email.');
+                  return;
+                }
+
                 final userSnap = await FirebaseFirestore.instance
                     .collection('users')
                     .where('email', isEqualTo: email)
                     .limit(1)
                     .get();
+
                 if (userSnap.docs.isEmpty) {
-                  setStateInner(() => error = 'User not found');
+                  setStateInner(() => error = 'User not found with that email.');
                   return;
                 }
-                // Aquí podrías agregar lógica para actualizar la base de datos, etc.
-                Navigator.pop(contextInner);
-                // Opcional: feedback visual
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Invitation sent to $email')),
-                );
+
+                final invitedUser = UserModel.fromMap(userSnap.docs.first.data(), userSnap.docs.first.id);
+                
+                // Devolver el usuario invitado al cerrar el diálogo
+                Navigator.pop(contextInner, invitedUser);
               },
               child: const Text('Invite'),
             ),

@@ -19,6 +19,7 @@ import 'screens/create_password_screen.dart';
 import 'screens/link_google_screen.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'config/app_check_init.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +27,10 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await initializeAppCheck(); // Inicializa App Check
+  // Configura la persistencia de sesión para web
+  if (kIsWeb) {
+    await firebase_auth.FirebaseAuth.instance.setPersistence(firebase_auth.Persistence.LOCAL);
+  }
   runApp(const SplitUpApp());
 }
 

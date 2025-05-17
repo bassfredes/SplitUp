@@ -142,12 +142,12 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                           ? const Center(child: CircularProgressIndicator())
                           : error != null
                               ? Padding(
-                                  padding: const EdgeInsets.all(32),
+                                  padding: EdgeInsets.all(isMobile ? 8 : 18),
                                   child: Text(error!, style: const TextStyle(color: Colors.red, fontSize: 18)),
                                 )
                               : expense == null
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(32),
+                                  ? Padding(
+                                      padding: EdgeInsets.all(isMobile ? 8 : 18),
                                       child: Text('Expense not found.'),
                                     )
                                   : Column(

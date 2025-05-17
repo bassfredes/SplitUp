@@ -14,6 +14,8 @@ import '../config/constants.dart';
 import '../widgets/header.dart';
 import '../utils/formatters.dart';
 import '../widgets/app_footer.dart';
+import '../widgets/category_spending_chart.dart';
+import '../providers/expense_provider.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -132,11 +134,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final user = authProvider.user!;
-    final groupProvider = Provider.of<GroupProvider>(context);
+  Widget _buildDashboardContent(String? groupId, UserModel user, GroupProvider groupProvider) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FA),
       floatingActionButton: FloatingActionButton.extended(
@@ -159,7 +157,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     onGroups: () => Navigator.pushReplacementNamed(context, '/groups'),
                     onAccount: () => Navigator.pushReplacementNamed(context, '/account'),
                     onLogout: () async {
-                      await authProvider.signOut();
+                      await Provider.of<AuthProvider>(context, listen: false).signOut();
                       Navigator.pushReplacementNamed(context, '/login');
                     },
                     avatarUrl: user.photoUrl,
@@ -247,7 +245,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                                                   }
                                                   final value = balances.values.first;
                                                   final currency = balances.keys.first;
-                                                  final color = value < 0 ? Color(0xFFE14B4B) : Color(0xFF1BC47D);
+                                                  final color = value < 0 ? const Color(0xFFE14B4B) : const Color(0xFF1BC47D);
                                                   return Padding(
                                                     padding: const EdgeInsets.only(top: 8.0),
                                                     child: Text(
@@ -303,7 +301,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                                                         }
                                                         final value = balances.values.first;
                                                         final currency = balances.keys.first;
-                                                        final color = value < 0 ? Color(0xFFE14B4B) : Color(0xFF1BC47D);
+                                                        final color = value < 0 ? const Color(0xFFE14B4B) : const Color(0xFF1BC47D);
                                                         return Padding(
                                                           padding: const EdgeInsets.only(top: 8.0),
                                                           child: Text(
@@ -375,6 +373,21 @@ class _DashboardContentState extends State<_DashboardContent> {
                               ],
                             ),
                           ),
+                          // Widget de gastos por categoría
+                          if (groupId != null) ...[
+                            const SizedBox(height: 24),
+                            Card(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              elevation: 0,
+                              color: Colors.white,
+                              child: Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: CategorySpendingChart(groupId: groupId),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -387,6 +400,29 @@ class _DashboardContentState extends State<_DashboardContent> {
         ),
       ),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user!;
+    final groupProvider = Provider.of<GroupProvider>(context);
+    
+    // Obtener el ID del primer grupo para cargar los gastos
+    final firstGroupId = groupProvider.groups.isNotEmpty ? groupProvider.groups.first.id : null;
+    
+    Widget content;
+    
+    if (firstGroupId != null) {
+      content = ChangeNotifierProvider<ExpenseProvider>(
+        create: (_) => ExpenseProvider()..loadExpenses(firstGroupId),
+        child: _buildDashboardContent(firstGroupId, user, groupProvider),
+      );
+    } else {
+      content = _buildDashboardContent(null, user, groupProvider);
+    }
+    
+    return content;
   }
 }
 
