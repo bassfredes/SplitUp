@@ -167,7 +167,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Nuevo Gasto', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text('New Expense', style: TextStyle(fontWeight: FontWeight.bold)),
         Wrap(
           spacing: 8,
           children: widget.participants.map((u) {
@@ -201,7 +201,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('¿Quién pagó?', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text('Who paid?', style: TextStyle(fontWeight: FontWeight.bold)),
         DropdownButtonFormField<String>(
           value: _selectedPayer,
           items: [
@@ -241,7 +241,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text('Fecha', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
         TextButton(
           onPressed: () async {
             final picked = await showDatePicker(
@@ -272,14 +272,14 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
       children: [
         Row(
           children: [
-            const Text('División:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Split:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(width: 8),
             DropdownButton<String>(
               value: _splitType,
               items: const [
-                DropdownMenuItem(value: 'equal', child: Text('Igual')),
-                DropdownMenuItem(value: 'custom', child: Text('Montos')),
-                DropdownMenuItem(value: 'percent', child: Text('Porcentaje')),
+                DropdownMenuItem(value: 'equal', child: Text('Equal')),
+                DropdownMenuItem(value: 'custom', child: Text('Amounts')),
+                DropdownMenuItem(value: 'percent', child: Text('Percent')),
                 DropdownMenuItem(value: 'shares', child: Text('Shares')),
               ],
               onChanged: (v) {
@@ -292,7 +292,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
             if (_splitType == 'equal' || _splitType == 'percent')
               TextButton(
                 onPressed: _splitType == 'equal' ? _setEqualSplit : _setPercentSplit,
-                child: const Text('Dividir igual'),
+                child: const Text('Split equally'),
               ),
           ],
         ),
@@ -380,7 +380,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Resumen de participantes', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Participants summary', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             ..._selectedParticipants.map((id) {
               final user = widget.participants.firstWhere(
@@ -419,15 +419,15 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
     if (_splitType == 'percent') {
       final totalPercent = _selectedParticipants.fold<double>(0, (sum, id) => sum + (_customSplits[id] ?? 0));
       if ((totalPercent - 100.0).abs() > 0.01) {
-        print('[DEBUG] Error: suma de porcentajes != 100');
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La suma de los porcentajes debe ser 100%')));
+        print('[DEBUG] Error: sum of percentages != 100');
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The sum of percentages must be 100%')));
         return;
       }
     } else if (_splitType == 'equal' || _splitType == 'custom') {
       final totalSplit = _selectedParticipants.fold<double>(0, (sum, id) => sum + (_customSplits[id] ?? 0));
       if ((totalSplit - amount).abs() > 0.01) {
-        print('[DEBUG] Error: suma de montos != total');
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La suma de los montos debe ser igual al total')));
+        print('[DEBUG] Error: sum of amounts != total');
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The sum of the amounts must be equal to the total')));
         return;
       }
     }
@@ -439,8 +439,8 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           : _customSplits.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
       final firestoreService = FirestoreService();
       print('[DEBUG] Datos para Firestore:');
-      print('payers: ' + payers.toString());
-      print('customSplits: ' + (customSplits?.toString() ?? 'null'));
+      print('payers: $payers');
+      print('customSplits: ${customSplits?.toString() ?? 'null'}');
       print('amount: $amount, currency: $_currency, participantes: $_selectedParticipants');
       if (widget.expenseToEdit != null) {
         final updatedExpense = ExpenseModel(
@@ -460,7 +460,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           isLocked: false,
           currency: _currency,
         );
-        print('[DEBUG] updatedExpense.toMap(): ' + updatedExpense.toMap().toString());
+        print('[DEBUG] updatedExpense.toMap(): ${updatedExpense.toMap()}');
         await firestoreService.updateExpense(updatedExpense);
         setState(() => _loading = false);
         if (!mounted) return;
@@ -483,7 +483,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           isLocked: false,
           currency: _currency,
         );
-        print('[DEBUG] expense.toMap(): ' + expense.toMap().toString());
+        print('[DEBUG] expense.toMap(): ${expense.toMap()}');
         await firestoreService.addExpense(expense);
         await FirebaseAnalytics.instance.logEvent(
           name: 'add_payment',
@@ -499,11 +499,11 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
       }
     } catch (e, stack) {
       setState(() => _loading = false);
-      print('Error al guardar el gasto:');
+      print('Error saving expense:');
       print(e);
       print(stack);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar el gasto: \n${e.toString()}')),
+        SnackBar(content: Text('Error saving expense: \n${e.toString()}')),
       );
     }
   }
@@ -553,7 +553,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     if (widget.participants.isEmpty) {
-      // Solo mensaje de error, sin doble tarjeta
+      // Only error message, no double card
       return Padding(
         padding: const EdgeInsets.all(32),
         child: Center(
@@ -569,9 +569,9 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
         children: [
           Breadcrumb(
             items: [
-              BreadcrumbItem('Inicio', route: '/dashboard'),
-              BreadcrumbItem(widget.groupName != null ? 'Grupo: ${widget.groupName}' : 'Grupo', route: '/group/${widget.groupId}'),
-              BreadcrumbItem(widget.expenseToEdit != null ? 'Editando Gasto: ${widget.expenseToEdit!.description}' : 'Nuevo Gasto'),
+              BreadcrumbItem('Home', route: '/dashboard'),
+              BreadcrumbItem(widget.groupName != null ? 'Group: ${widget.groupName}' : 'Group', route: '/group/${widget.groupId}'),
+              BreadcrumbItem(widget.expenseToEdit != null ? 'Editing Expense: ${widget.expenseToEdit!.description}' : 'New Expense'),
             ],
             onTap: (i) {
               if (i == 0) Navigator.pushReplacementNamed(context, '/dashboard');
@@ -580,7 +580,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           ),
           const SizedBox(height: 32),
           Text(
-            widget.expenseToEdit != null ? 'Editando Gasto' : 'Nuevo Gasto',
+            widget.expenseToEdit != null ? 'Editing Expense' : 'New Expense',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
           ),
           const SizedBox(height: 16),
@@ -595,11 +595,11 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                   children: [
                     TextFormField(
                       controller: _amountController,
-                      decoration: _inputDecoration(label: 'Monto total', hint: _amountPlaceholder),
+                      decoration: _inputDecoration(label: 'Total value', hint: _amountPlaceholder),
                       keyboardType: _currency == 'CLP'
                           ? TextInputType.number
                           : const TextInputType.numberWithOptions(decimal: true),
-                      validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Monto inválido' : null,
+                      validator: (v) => v == null || double.tryParse(_formatAmountInput(v)) == null ? 'Invalid value' : null,
                       onChanged: (v) {
                         final formatted = _formatAmountInput(v);
                         if (v != formatted) {
@@ -629,9 +629,9 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                               value: c['code'],
                               child: Row(
                                 children: [
-                                  Text(c['icon'] ?? ''),
+                                  Text(c['icon'] ?? '', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color)),
                                   const SizedBox(width: 4),
-                                  Text(c['label'] ?? ''),
+                                  Text(c['label'] ?? '', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color)),
                                 ],
                               ),
                             )).toList(),
@@ -710,7 +710,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Agregar imagen', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Add image', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     GestureDetector(
                       onTap: () async {
@@ -737,7 +737,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                           children: [
                             const Icon(Icons.camera_alt, size: 32, color: Colors.grey),
                             const SizedBox(height: 6),
-                            Text('Agregar', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                            Text('Add', style: TextStyle(color: Colors.grey, fontSize: 13)),
                           ],
                         ),
                       ),
@@ -754,8 +754,8 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           const SizedBox(height: 28),
           TextFormField(
             controller: _descController,
-            decoration: _inputDecoration(label: 'Descripción', hint: 'Ej: bebidas'),
-            validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+            decoration: _inputDecoration(label: 'Description', hint: 'E.g. drinks'),
+            validator: (v) => v == null || v.isEmpty ? 'Required field' : null,
           ),
           const SizedBox(height: 28),
           Row(
@@ -777,8 +777,8 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                       }
                     });
                   },
-                  decoration: _inputDecoration(label: 'Categoría'),
-                  validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                  decoration: _inputDecoration(label: 'Category'),
+                  validator: (v) => v == null || v.isEmpty ? 'Required field' : null,
                 ),
               ),
               if (_selectedCategory == 'otra')
@@ -787,8 +787,8 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _categoryController,
-                    decoration: _inputDecoration(label: 'Otra categoría'),
-                    validator: (v) => v == null || v.isEmpty ? 'Campo requerido' : null,
+                    decoration: _inputDecoration(label: 'Other category'),
+                    validator: (v) => v == null || v.isEmpty ? 'Required field' : null,
                   ),
                 ),
             ],
@@ -813,12 +813,12 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
                     _imagePath = null;
                   });
                 },
-                child: const Text('Guardar y agregar otro'),
+                child: const Text('Save and add another'),
               ),
               const SizedBox(width: 16),
               ElevatedButton.icon(
                 icon: Icon(widget.expenseToEdit != null ? Icons.save : Icons.add),
-                label: Text(widget.expenseToEdit != null ? 'Guardar cambios' : 'Agregar gasto'),
+                label: Text(widget.expenseToEdit != null ? 'Save changes' : 'Add expense'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryColor,
                   foregroundColor: Colors.white,

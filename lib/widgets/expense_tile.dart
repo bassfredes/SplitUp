@@ -58,74 +58,78 @@ class ExpenseTile extends StatelessWidget {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     if (isMobile) {
-      return Card(
-        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  if (categoryIcon != null)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.teal.withOpacity(0.10),
-                        borderRadius: BorderRadius.circular(10),
+      return InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Card(
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (categoryIcon != null)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(categoryIcon, color: Colors.teal[700], size: 22),
                       ),
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(categoryIcon, color: Colors.teal[700], size: 22),
+                    if (categoryIcon != null) const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _formatAmountWithCurrency(expense.amount, expense.currency),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Color(0xFF179D8B)),
+                      ),
                     ),
-                  if (categoryIcon != null) const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _formatAmountWithCurrency(expense.amount, expense.currency),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Color(0xFF179D8B)),
+                    avatar,
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  expense.description,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.person, size: 16, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Flexible(child: Text('Paid by: ${payer?.name ?? payerId}', style: const TextStyle(fontSize: 14, color: Colors.grey))),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(expense.date.toLocal().toString().split(' ')[0], style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(net < 0 ? Icons.arrow_upward : (net > 0 ? Icons.arrow_downward : Icons.check_circle), size: 16, color: netColor),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        net != 0 ? '$netLabel: ${_formatAmountWithCurrency(net.abs(), expense.currency)}' : 'Settled: ${_formatAmountWithCurrency(0, expense.currency)}',
+                        style: TextStyle(color: netColor, fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
                     ),
-                  ),
-                  avatar,
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                expense.description,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.person, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Flexible(child: Text('Paid by: ${payer?.name ?? payerId}', style: const TextStyle(fontSize: 14, color: Colors.grey))),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(expense.date.toLocal().toString().split(' ')[0], style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(net < 0 ? Icons.arrow_upward : (net > 0 ? Icons.arrow_downward : Icons.check_circle), size: 16, color: netColor),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      net != 0 ? '$netLabel: ${_formatAmountWithCurrency(net.abs(), expense.currency)}' : 'Settled: ${_formatAmountWithCurrency(0, expense.currency)}',
-                      style: TextStyle(color: netColor, fontWeight: FontWeight.w600, fontSize: 14),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       );

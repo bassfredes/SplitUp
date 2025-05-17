@@ -272,7 +272,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                                                     elevation: 0,
                                                   ),
-                                                  child: const Text('Settle up', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
+                                                  child: const Text('Settle up', style: TextStyle(fontWeight: FontWeight.w400, fontSize: 16, color: Colors.white)),
                                                 ),
                                               ),
                                             ],

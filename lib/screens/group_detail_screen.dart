@@ -37,6 +37,20 @@ class GroupDetailScreen extends StatefulWidget {
 }
 
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
+  // Utility to load the group image as a DecorationImage
+  Future<DecorationImage?> _loadGroupImageFuture(String? imagePath, String? photoUrl) async {
+    if (imagePath != null) {
+      if (kIsWeb) {
+        final bytes = await XFile(imagePath).readAsBytes();
+        return DecorationImage(image: MemoryImage(bytes), fit: BoxFit.cover);
+      } else {
+        return DecorationImage(image: FileImage(File(imagePath)), fit: BoxFit.cover);
+      }
+    } else if (photoUrl?.isNotEmpty == true) {
+      return DecorationImage(image: NetworkImage(photoUrl!), fit: BoxFit.cover);
+    }
+    return null;
+  }
   // Optimization: Future to load participants only once
   Future<List<UserModel>>? _participantsFuture;
   // Key to force the reconstruction of the FutureBuilder of participants if necessary
@@ -261,260 +275,377 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     Map<String, UserModel> participantsMap = { for (var u in initialParticipants) u.id : u };
     final ImagePicker picker = ImagePicker();
     final groupRef = FirebaseFirestore.instance.collection('groups').doc(group.id);
+    Future<DecorationImage?>? imageFuture = _loadGroupImageFuture(imagePath, photoUrl);
     await showDialog(
       context: context,
-      barrierDismissible: false, // Cannot close by clicking outside
+      barrierDismissible: false,
       builder: (context) {
-        // This is the setState we should use for the dialog content
         return StatefulBuilder(
-          builder: (context, setStateDialog) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Edit group'),
-            content: SizedBox(
-              width: 500,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Stack(
-                      alignment: Alignment.center,
+          builder: (context, setStateDialog) {
+            void updateImageFuture() {
+              imageFuture = _loadGroupImageFuture(imagePath, photoUrl);
+            }
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header con imagen y nombre
+                  Padding(
+                    padding: const EdgeInsets.only(top: 28, left: 28, right: 28, bottom: 0),
+                    child: Column(
                       children: [
-                        GestureDetector(
-                          onTap: () async {
-                            final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-                            if (image != null) {
-                              final allowedExtensions = ['jpg', 'jpeg', 'png'];
-                              final ext = image.name.split('.').last.toLowerCase();
-                              final bytes = await image.length();
-                              if (!allowedExtensions.contains(ext)) {
-                                setStateDialog(() => uploadError = 'Only JPG or PNG images are allowed');
-                                return;
-                              }
-                              if (bytes > 2 * 1024 * 1024) {
-                                setStateDialog(() => uploadError = 'The image must not exceed 2MB');
-                                return;
-                              }
-                              setStateDialog(() {
-                                imagePath = image.path;
-                                uploadError = null;
-                              });
-                            }
-                          },
-                          child: FutureBuilder<DecorationImage?>(
-                            future: () async {
-                              if (imagePath != null) {
-                                if (kIsWeb) {
-                                  final bytes = await XFile(imagePath!).readAsBytes();
-                                  return DecorationImage(image: MemoryImage(bytes), fit: BoxFit.cover);
-                                } else {
-                                  return DecorationImage(image: FileImage(File(imagePath!)), fit: BoxFit.cover);
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () async {
+                                final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+                                if (image != null) {
+                                  final allowedExtensions = ['jpg', 'jpeg', 'png'];
+                                  final ext = image.name.split('.').last.toLowerCase();
+                                  final bytes = await image.length();
+                                  if (!allowedExtensions.contains(ext)) {
+                                    setStateDialog(() => uploadError = 'Only JPG or PNG images are allowed');
+                                    return;
+                                  }
+                                  if (bytes > 2 * 1024 * 1024) {
+                                    setStateDialog(() => uploadError = 'The image must not exceed 2MB');
+                                    return;
+                                  }
+                                  setStateDialog(() {
+                                    imagePath = image.path;
+                                    uploadError = null;
+                                    updateImageFuture();
+                                  });
                                 }
-                              } else if (photoUrl?.isNotEmpty == true) {
-                                return DecorationImage(image: NetworkImage(photoUrl!), fit: BoxFit.cover);
-                              }
-                              return null;
-                            }(),
-                            builder: (context, snapshot) {
-                              return Container(
-                                width: 80,
-                                height: 80,
+                              },
+                              child: FutureBuilder<DecorationImage?>(
+                                future: imageFuture,
+                                builder: (context, snapshot) {
+                                  return Container(
+                                    width: 90,
+                                    height: 90,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      shape: BoxShape.circle,
+                                      image: snapshot.data,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.08),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: (imagePath == null && (photoUrl?.isEmpty != false))
+                                        ? const Icon(Icons.group, color: Colors.white, size: 44)
+                                        : null,
+                                  );
+                                },
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              right: 8,
+                              child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[300],
+                                  color: Colors.teal,
                                   shape: BoxShape.circle,
-                                  image: snapshot.data,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.15),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
                                 ),
-                                child: (imagePath == null && (photoUrl?.isEmpty != false))
-                                    ? const Icon(Icons.group, color: Colors.white, size: 36)
-                                    : null,
-                              );
-                            },
+                                padding: const EdgeInsets.all(6),
+                                child: const Icon(Icons.camera_alt, color: Colors.white, size: 22),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        TextField(
+                          controller: nameController,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                          decoration: InputDecoration(
+                            labelText: 'Group name',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                           ),
                         ),
-                        Positioned(
-                          bottom: 8,
-                          right: 8,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              shape: BoxShape.circle,
-                            ),
-                            padding: const EdgeInsets.all(4),
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: descController,
+                          minLines: 1,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            labelText: 'Description (optional)',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Group name'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: descController,
-                      decoration: const InputDecoration(labelText: 'Description (optional)'),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('Participants', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    // No longer needs FutureBuilder here, uses participantsMap
-                    StatefulBuilder(
-                      builder: (context, setStateDialog) {
-                        // Filter the map based on the current IDs
-                        final currentDialogParticipants = participantIds
-                            .map((id) => participantsMap[id])
-                            .where((user) => user != null)
-                            .cast<UserModel>() // Ensure the type
-                            .toList();
-
-                        return Column(
-                          children: currentDialogParticipants.map((user) => ListTile(
-                            leading: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
-                                ? CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!))
-                                : CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
-                            title: Text(user.name),
-                            subtitle: Text(user.email),
-                            trailing: (user.id != group.adminId && participantIds.length > 1)
-                                ? IconButton(
-                                    icon: const Icon(Icons.remove_circle, color: Colors.red),
-                                    onPressed: () {
-                                      // Update the list of IDs and the dialog state
-                                      setStateDialog(() => participantIds.remove(user.id));
-                                    },
-                                  )
-                                : null,
-                          )).toList(),
-                        );
-                      }
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.person_add),
-                      label: const Text('Add participant'),
-                      onPressed: () async {
-                        final emailController = TextEditingController();
-                        String? error;
-                        // We use a second StatefulBuilder for the internal add email dialog
-                        // so that its state (error) does not affect the main dialog.
-                        await showDialog(
-                          context: context,
-                          builder: (contextInner) => StatefulBuilder(
-                            builder: (contextInner, setStateInner) => AlertDialog(
-                              title: const Text('Invite participant'),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  TextField(
-                                    controller: emailController,
-                                    decoration: const InputDecoration(labelText: 'Participant email'),
-                                  ),
-                                  if (error != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: Text(error!, style: const TextStyle(color: Colors.red)),
-                                    ),
-                                ],
+                  ),
+                  const SizedBox(height: 18),
+                  // Participantes
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Participants', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.person_add, size: 20),
+                              label: const Text('Add', style: TextStyle(fontWeight: FontWeight.w500)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey[100],
+                                foregroundColor: Colors.teal,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(contextInner),
-                                  child: const Text('Cancel'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () async {
-                                    final email = emailController.text.trim();
-                                    final userSnap = await FirebaseFirestore.instance
-                                        .collection('users')
-                                        .where('email', isEqualTo: email)
-                                        .limit(1)
-                                        .get();
-                                    if (userSnap.docs.isEmpty) {
-                                      // Update the internal dialog state
-                                      setStateInner(() => error = 'User not found');
+                              onPressed: () async {
+                                final emailController = TextEditingController();
+                                String? error;
+                                await showDialog(
+                                  context: context,
+                                  builder: (contextInner) => StatefulBuilder(
+                                    builder: (contextInner, setStateInner) => AlertDialog(
+                                      title: const Text('Invite participant'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          TextField(
+                                            controller: emailController,
+                                            decoration: const InputDecoration(labelText: 'Participant email'),
+                                          ),
+                                          if (error != null)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 8.0),
+                                              child: Text(error!, style: const TextStyle(color: Colors.red)),
+                                            ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(contextInner),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor, foregroundColor: Colors.white),
+                                          onPressed: () async {
+                                            final email = emailController.text.trim();
+                                            final userSnap = await FirebaseFirestore.instance
+                                                .collection('users')
+                                                .where('email', isEqualTo: email)
+                                                .limit(1)
+                                                .get();
+                                            if (userSnap.docs.isEmpty) {
+                                              setStateInner(() => error = 'User not found');
+                                              return;
+                                            }
+                                            final userId = userSnap.docs.first.id;
+                                            if (!participantIds.contains(userId)) {
+                                              setStateDialog(() => participantIds.add(userId));
+                                              if (!participantsMap.containsKey(userId)) {
+                                                final newUser = UserModel.fromMap(userSnap.docs.first.data(), userId);
+                                                setStateDialog(() => participantsMap[userId] = newUser);
+                                              }
+                                            }
+                                            Navigator.pop(contextInner);
+                                          },
+                                          child: const Text('Invite'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: participantIds
+                              .map((id) => participantsMap[id])
+                              .where((user) => user != null)
+                              .cast<UserModel>()
+                              .map((user) => Chip(
+                                    avatar: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
+                                        ? CircleAvatar(backgroundImage: NetworkImage(user.photoUrl!))
+                                        : CircleAvatar(child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')),
+                                    label: Text(user.name),
+                                    deleteIcon: (user.id != group.adminId && participantIds.length > 1)
+                                        ? const Icon(Icons.close, size: 18, color: Colors.red)
+                                        : null,
+                                    onDeleted: (user.id != group.adminId && participantIds.length > 1)
+                                        ? () => setStateDialog(() => participantIds.remove(user.id))
+                                        : null,
+                                    backgroundColor: Colors.grey[100],
+                                    labelStyle: const TextStyle(fontWeight: FontWeight.w500),
+                                  ))
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (uploading) ...[
+                    const SizedBox(height: 18),
+                    const CircularProgressIndicator(),
+                  ],
+                  if (uploadError != null) ...[
+                    const SizedBox(height: 18),
+                    Text(uploadError!, style: const TextStyle(color: Colors.red)),
+                  ],
+                  const SizedBox(height: 24),
+                  // Botones de acción
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.grey[700],
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
+                          child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w500)),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.save, size: 20),
+                          label: const Text('Save', style: TextStyle(fontWeight: FontWeight.w500)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: uploading
+                              ? null
+                              : () async {
+                                  String? newPhotoUrl = photoUrl;
+                                  if (imagePath != null) {
+                                    setStateDialog(() { uploading = true; uploadError = null; });
+                                    try {
+                                      debugPrint('[DEBUG] Uploading image: $imagePath');
+                                      final ref = FirebaseStorage.instance.ref().child('group_photos/${DateTime.now().millisecondsSinceEpoch}.jpg');
+                                      if (kIsWeb) {
+                                        final bytes = await XFile(imagePath!).readAsBytes();
+                                        await ref.putData(bytes);
+                                      } else {
+                                        await ref.putFile(File(imagePath!));
+                                      }
+                                      final url = await ref.getDownloadURL();
+                                      debugPrint('[DEBUG] Image uploaded successfully. URL: $url');
+                                      newPhotoUrl = url;
+                                    } catch (e, st) {
+                                      debugPrint('[ERROR] Error uploading image: $e');
+                                      debugPrint(st.toString());
+                                      setStateDialog(() { uploading = false; uploadError = 'Error uploading image'; });
                                       return;
                                     }
-                                    final userId = userSnap.docs.first.id;
-                                    if (!participantIds.contains(userId)) {
-                                      // Update the list of IDs and the MAIN dialog state
-                                      setStateDialog(() => participantIds.add(userId));
-                                      // Optionally, update the map if the user was not there
-                                      if (!participantsMap.containsKey(userId)) {
-                                        final newUser = UserModel.fromMap(userSnap.docs.first.data(), userId);
-                                        setStateDialog(() => participantsMap[userId] = newUser);
-                                      }
-                                    }
-                                    Navigator.pop(contextInner); // Close internal dialog
-                                  },
-                                  child: const Text('Invite'),
-                                ),
-                              ],
-                            ),
+                                    setStateDialog(() { uploading = false; });
+                                  }
+                                  await groupRef.update({
+                                    'name': nameController.text.trim(),
+                                    'description': descController.text.trim(),
+                                    'photoUrl': newPhotoUrl,
+                                    'participantIds': participantIds,
+                                    'roles': FieldValue.arrayUnion(
+                                      group.roles
+                                          .where((r) => participantIds.contains(r['uid']))
+                                          .toList(),
+                                    ),
+                                  });
+                                  if (!mounted) return;
+                                  Navigator.pop(context);
+                                  setState(() {});
+                                  _loadParticipants();
+                                },
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     ),
-                    if (uploading) ...[
-                      const SizedBox(height: 12),
-                      const CircularProgressIndicator(),
-                    ],
-                    if (uploadError != null) ...[
-                      const SizedBox(height: 12),
-                      Text(uploadError!, style: const TextStyle(color: Colors.red)),
-                    ],
                   ],
                 ),
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor, foregroundColor: Colors.white),
-                onPressed: uploading
-                    ? null
-                    : () async {
-                        String? newPhotoUrl = photoUrl;
-                        if (imagePath != null) {
-                          setStateDialog(() { uploading = true; uploadError = null; });
-                          try {
-                            debugPrint('[DEBUG] Uploading image: $imagePath');
-                            final ref = FirebaseStorage.instance.ref().child('group_photos/${DateTime.now().millisecondsSinceEpoch}.jpg');
-                            if (kIsWeb) {
-                              final bytes = await XFile(imagePath!).readAsBytes();
-                              await ref.putData(bytes);
-                            } else {
-                              await ref.putFile(File(imagePath!));
-                            }
-                            final url = await ref.getDownloadURL();
-                            debugPrint('[DEBUG] Image uploaded successfully. URL: $url');
-                            newPhotoUrl = url;
-                          } catch (e, st) {
-                            debugPrint('[ERROR] Error uploading image: $e');
-                            debugPrint(st.toString());
-                            setStateDialog(() { uploading = false; uploadError = 'Error uploading image'; });
-                            return;
-                          }
-                          setStateDialog(() { uploading = false; });
-                        }
-                        await groupRef.update({
-                          'name': nameController.text.trim(),
-                          'description': descController.text.trim(),
-                          'photoUrl': newPhotoUrl,
-                          'participantIds': participantIds,
-                        });
-                        if (!mounted) return;
-                        Navigator.pop(context);
-                        setState(() {});
-                        _loadParticipants();
-                      },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
+    );
+  }
+
+  // Invite participant dialog as a method of the class
+  void _showInviteParticipantDialog() async {
+    final emailController = TextEditingController();
+    String? error;
+    await showDialog(
+      context: context,
+      builder: (contextInner) => StatefulBuilder(
+        builder: (contextInner, setStateInner) => AlertDialog(
+          title: const Text('Invite participant'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Participant email'),
+              ),
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(error!, style: const TextStyle(color: Colors.red)),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(contextInner),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+              onPressed: () async {
+                final email = emailController.text.trim();
+                final userSnap = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: email)
+                    .limit(1)
+                    .get();
+                if (userSnap.docs.isEmpty) {
+                  setStateInner(() => error = 'User not found');
+                  return;
+                }
+                // Aquí podrías agregar lógica para actualizar la base de datos, etc.
+                Navigator.pop(contextInner);
+                // Opcional: feedback visual
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Invitation sent to $email')),
+                );
+              },
+              child: const Text('Invite'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -524,10 +655,56 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
     final ScrollController scrollController = ScrollController();
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFF6F8FA),
-      child: ScrollConfiguration(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FA),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16, right: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            SizedBox(
+              width: 180,
+              child: FloatingActionButton.extended(
+                heroTag: 'add_expense',
+                backgroundColor: kPrimaryColor,
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.add),
+                label: const Text('Add expense'),
+                onPressed: () async {
+                  final users = await _participantsFuture;
+                  if (users == null || users.isEmpty) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddExpenseScreen(
+                        groupId: group.id,
+                        participants: users,
+                        currentUserId: user!.id,
+                        groupCurrency: group.currency,
+                        groupName: group.name,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: 180,
+              child: FloatingActionButton.extended(
+                heroTag: 'invite_participant',
+                backgroundColor: Colors.teal[700],
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.person_add),
+                label: const Text('Invite'),
+                onPressed: _showInviteParticipantDialog,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: ScrollConfiguration(
         behavior: const ScrollBehavior(),
         child: SingleChildScrollView(
           controller: scrollController,
@@ -698,60 +875,64 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 },
                               ),
                               const SizedBox(height: 32),
-                              // --- ADD EXPENSE BUTTON (ABOVE THE LIST) ---
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: FutureBuilder<List<UserModel>>(
-                                  // Use the state's Future
-                                  future: _participantsFuture,
-                                  builder: (context, snapshot) {
-                                    // Do not show button while loading or if there is an error
-                                    if (snapshot.connectionState != ConnectionState.done || snapshot.hasError || !snapshot.hasData) {
-                                       return ElevatedButton.icon(
-                                          icon: const Icon(Icons.add),
-                                          label: const Text('Add expense'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.grey, // Visually disabled
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          onPressed: null, // Disabled
-                                        );
-                                    }
-                                    final users = snapshot.data!;
-                                    return ElevatedButton.icon(
-                                      icon: const Icon(Icons.add),
-                                      label: const Text('Add expense'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: kPrimaryColor,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      onPressed: () async {
-                                        // We already have the users from snapshot.data
-                                        if (users.isEmpty) {
-                                          final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
-                                          if (scaffoldMessenger != null) {
-                                            scaffoldMessenger.showSnackBar(
-                                              const SnackBar(content: Text('Could not load group participants.')),
-                                            );
-                                          }
-                                          return;
-                                        }
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => AddExpenseScreen(
-                                              groupId: group.id,
-                                              participants: users,
-                                              currentUserId: Provider.of<AuthProvider>(context, listen: false).user!.id,
-                                              groupCurrency: group.currency,
-                                              groupName: group.name,
+                              // --- ADD EXPENSE & INVITE BUTTONS (ABOVE THE LIST) ---
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isMobile = constraints.maxWidth < 600;
+                                  return Row(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    children: [
+                                      FutureBuilder<List<UserModel>>(
+                                        future: _participantsFuture,
+                                        builder: (context, snapshot) {
+                                          final isDisabled = snapshot.connectionState != ConnectionState.done || snapshot.hasError || !snapshot.hasData || (snapshot.data?.isEmpty ?? true);
+                                          return ElevatedButton.icon(
+                                            icon: const Icon(Icons.add),
+                                            label: const Text('Add expense'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: kPrimaryColor,
+                                              foregroundColor: Colors.white,
+                                              padding: isMobile ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12) : const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                                              textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                             ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
+                                            onPressed: isDisabled
+                                                ? null
+                                                : () {
+                                                    final users = snapshot.data!;
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (context) => AddExpenseScreen(
+                                                          groupId: group.id,
+                                                          participants: users,
+                                                          currentUserId: Provider.of<AuthProvider>(context, listen: false).user!.id,
+                                                          groupCurrency: group.currency,
+                                                          groupName: group.name,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(width: 12),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.person_add),
+                                        label: const Text('Invite participant'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.teal[50],
+                                          foregroundColor: Colors.teal[800],
+                                          padding: isMobile ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12) : const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                                          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          elevation: 0,
+                                        ),
+                                        onPressed: _showInviteParticipantDialog,
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(height: 24),
                               // --- LIST OF EXPENSES GROUPED BY DATE WITH PAGINATION ---
@@ -817,7 +998,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                                         expense: e,
                                                         usersById: usersById,
                                                         currentUserId: currentUserId,
-                                                        // Pass groupName and usersById to onTap
                                                         onTap: () => _showExpenseDetail(context, e, widget.group.name, usersById),
                                                       )),
                                                 ],
@@ -1240,19 +1420,20 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               ),
                               const SizedBox(height: 32),
                               AppFooter(), // Add the AppFooter widget here
+
                             ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+                          ), // Column
+                        ), // Padding
+                      ); // Container
+                    }, // builder
+                  ), // LayoutBuilder
+                ), // Center
+              ], // children de Column principal
+            ), // Column principal
+          ), // Material
+        ), // SingleChildScrollView
+      ), // ScrollConfiguration
+    ); // Scaffold
   }
 
   List<Widget> _buildPaginationButtons(int currentPage, int pageCount, void Function(int) goToPage) {

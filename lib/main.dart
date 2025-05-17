@@ -18,7 +18,6 @@ import 'screens/change_password_screen.dart';
 import 'screens/create_password_screen.dart';
 import 'screens/link_google_screen.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_analytics/observer.dart';
 import 'config/app_check_init.dart';
 
 void main() async {

@@ -20,6 +20,12 @@ class _EditNameScreenState extends State<EditNameScreen> {
   String? _error;
 
   @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     final user = Provider.of<AuthProvider>(context, listen: false).user;
@@ -46,9 +52,9 @@ class _EditNameScreenState extends State<EditNameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFF6F8FA),
-      child: SingleChildScrollView(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FA),
+      body: SingleChildScrollView(
         child: Column(
           children: [
             Header(
