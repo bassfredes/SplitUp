@@ -339,16 +339,18 @@ class _DashboardContentState extends State<_DashboardContent> {
                                       builder: (context, groupProvider, _) {
                                         if (groupProvider.loading) {
                                           return const Center(child: CircularProgressIndicator());
-                                        }
+                                        } 
                                         if (groupProvider.groups.isEmpty) {
                                           return const Text('No groups yet.');
                                         }
                                         return Column(
                                           children: groupProvider.groups.map((group) {
-                                            return _GroupCard(group: group, currentUserId: user.id);
+ return _GroupCard(group: group, currentUserId: user.id, participants: groupProvider.participants);
+ return _GroupCard(group: group, currentUserId: user.id, participants: groupProvider.participants, userBalance: groupProvider.userBalances[group.id] ?? 0.0);
                                           }).toList(),
                                         );
                                       },
+
                                     ),
                                   ],
                                 ),
@@ -407,296 +409,226 @@ class _DashboardContentState extends State<_DashboardContent> {
 class _GroupCard extends StatefulWidget {
   final GroupModel group;
   final String currentUserId;
-  const _GroupCard({required this.group, required this.currentUserId});
+  final Map<String, UserModel> participants;
+  final double userBalance;
+  final ExpenseModel? lastExpense;
+  const _GroupCard({
+    required this.group,
+    required this.currentUserId,
+    required this.participants,
 
   @override
   State<_GroupCard> createState() => _GroupCardState();
 }
 
 class _GroupCardState extends State<_GroupCard> {
-  bool _hovering = false;
-  late Future<Map<String, dynamic>> _futureData;
+ bool _hovering = false;
+ 
 
   @override
-  void initState() {
-    super.initState();
-    _futureData = () async {
-      final participantsMap = await _fetchParticipants(widget.group.participantIds);
-      final expenseSnap = await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.group.id)
-          .collection('expenses')
-          .orderBy('date', descending: true)
-          .limit(1)
-          .get();
-      ExpenseModel? lastExpense;
-      if (expenseSnap.docs.isNotEmpty) {
-        lastExpense = ExpenseModel.fromMap(expenseSnap.docs.first.data(), expenseSnap.docs.first.id);
-      }
-      return {'participants': participantsMap, 'lastExpense': lastExpense};
-    }();
-  }
+ Widget build(BuildContext context) {
+ if (widget.group.id.isEmpty) {
+ return const SizedBox.shrink();
+ }
 
-  Future<Map<String, UserModel>> _fetchParticipants(List<String> userIds) async {
-    if (userIds.isEmpty) return {};
-    final usersSnap = await FirebaseFirestore.instance
-        .collection('users')
-        .where(FieldPath.documentId, whereIn: userIds)
-        .get();
-    return { for (var doc in usersSnap.docs) doc.id : UserModel.fromMap(doc.data(), doc.id) };
-  }
-
-  Future<double> _getUserBalance() async {
-    final expensesSnap = await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(widget.group.id)
-        .collection('expenses')
-        .where('currency', isEqualTo: widget.group.currency)
-        .get();
-    double balance = 0;
-    for (var doc in expensesSnap.docs) {
-      final exp = ExpenseModel.fromMap(doc.data(), doc.id);
-      final paid = exp.payers.where((p) => p['userId'] == widget.currentUserId).fold<double>(0, (a, b) => a + (b['amount'] as num).toDouble());
-      final isParticipant = exp.participantIds.contains(widget.currentUserId);
-      final share = isParticipant
-          ? (exp.splitType == 'equal' ? exp.amount / exp.participantIds.length : _GroupCardState._getUserShare(exp, widget.currentUserId))
-          : 0;
-      balance += paid - share;
-    }
-    return balance;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.group.id.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _futureData,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: const Padding(padding: EdgeInsets.all(24), child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
+    // TODO: Optimize fetching the last expense and balance
+ return MouseRegion(
+ onEnter: (_) => setState(() => _hovering = true),
+ onExit: (_) => setState(() => _hovering = false),
+ child: AnimatedContainer(
+ duration: const Duration(milliseconds: 180),
+ curve: Curves.easeInOut,
+ margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
+ decoration: BoxDecoration(
+ color: _hovering ? const Color(0xFFF2F7FA) : Colors.white,
+ borderRadius: BorderRadius.circular(16),
+ border: Border.all(color: _hovering ? const Color(0xFF179D8B) : const Color(0xFFE6E6E6), width: 1.5),
+ boxShadow: _hovering
+ ? [BoxShadow(color: Colors.teal.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]
+ : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
+ ),
+ child: Material(
+ color: Colors.transparent,
+ child: InkWell(
+ borderRadius: BorderRadius.circular(16),
+ onTap: () => Navigator.pushNamed(context, '/group/${widget.group.id}'),
+ child: Padding(
+ padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
+ child: Row(
+ crossAxisAlignment: CrossAxisAlignment.center,
+ children: [
+ CircleAvatar(
+ radius: 28,
+ backgroundColor: Colors.teal[100],
+ backgroundImage: (widget.group.photoUrl != null && widget.group.photoUrl!.isNotEmpty)
+ ? NetworkImage(widget.group.photoUrl!)
+ : null,
+ child: (widget.group.photoUrl == null || widget.group.photoUrl!.isEmpty)
+ ? const Icon(Icons.group, size: 32, color: Colors.white)
+ : null,
+ ),
+ const SizedBox(width: 18),
+ Expanded(
+ child: Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ Row(
+ children: [
+ Expanded(
+ child: Text(
+ widget.group.name,
+ style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+ maxLines: 1,
+ overflow: TextOverflow.ellipsis,
+ ),
+ ),
+ // Menú de acciones adicionales (placeholder, puedes agregar más acciones aquí)
+ PopupMenuButton<String>(
+ tooltip: 'Acciones de grupo',
+ color: Colors.white,
+ elevation: 8,
+ shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+ offset: const Offset(0, 36),
+ icon: Container(
+ decoration: BoxDecoration(
+ color: const Color(0xFF179D8B).withOpacity(_hovering ? 0.18 : 0.12),
+ borderRadius: BorderRadius.circular(10),
+ ),
+ child: Icon(
+ Icons.more_vert,
+ size: 24,
+ color: _hovering ? const Color(0xFF179D8B) : Colors.grey[700],
+ ),
+ ),
+ onSelected: (value) async {
+ if (value == 'edit') {
+ // Use the participants passed to the widget
+ final participants = widget.participants.values.toList();
+ await showEditGroupDialog(context, widget.group, participants);
+ } else if (value == 'delete') {
+ final confirm = await showDialog<bool>(
+ context: context,
+ builder: (context) => AlertDialog(
+ title: const Text('Eliminar grupo'),
+ content: const Text('¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.'),
+ actions: [
+ TextButton(
+ onPressed: () => Navigator.pop(context, false),
+ child: const Text('Cancelar'),
+ ),
+ ElevatedButton.icon(
+ icon: const Icon(Icons.delete_outline, color: Colors.white),
+ style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+ onPressed: () => Navigator.pop(context, true),
+ label: const Text('Eliminar'),
+ ),
+ ],
+ ),
+ );
+ if (confirm == true) {
+ final authProvider = Provider.of<AuthProvider>(context, listen: false);
+ final user = authProvider.user;
+ if (user != null) {
+ await Provider.of<GroupProvider>(context, listen: false).deleteGroup(widget.group.id, user.id);
+ if (mounted) {
+ Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+ }
+ }
+ }
+ }
+ },
+ itemBuilder: (context) => [
+ PopupMenuItem(
+ value: 'edit',
+ child: ListTile(
+ leading: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
+ title: const Text('Editar grupo'),
+ ),
+ ),
+ PopupMenuItem(
+ value: 'delete',
+ child: ListTile(
+ leading: const Icon(Icons.delete_outline, color: Color(0xFFE14B4B)),
+ title: const Text('Eliminar grupo', style: TextStyle(color: Color(0xFFE14B4B))),
+ ),
+ ),
+ ],
+ ),
+ ],
+ ),
+ const SizedBox(height: 2),
+ FutureBuilder<double>(
+ future: Future.value(widget.userBalance),
+ builder: (context, snapshot) {
+ final color = widget.userBalance < -0.01 ? const Color(0xFFE14B4B)
+ : (bal > 0.01 ? const Color(0xFF1BC47D) : Colors.grey[700]);
+ return Text(
+ 'My balance: ${formatCurrency(bal, widget.group.currency)}',
+ style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 16),
           );
-        }
-        if (snapshot.hasError || !snapshot.hasData) {
+        },
+ ),
+          // TODO: Fetch last expense more efficiently
+ if (widget.lastExpense != null) {
+ final lastExpense = widget.lastExpense!;
+ return Column(
+ crossAxisAlignment: CrossAxisAlignment.start,
+ children: [
+ const SizedBox(height: 4),
+ Row(
+ mainAxisAlignment: MainAxisAlignment.start,
+ crossAxisAlignment: CrossAxisAlignment.center,
+ children: [
+ const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
+ const SizedBox(width: 4),
+ Flexible(
+ fit: FlexFit.loose,
+ child: Text(
+ 'Last expense: "${lastExpense.description}"',
+ style: const TextStyle(fontSize: 14, color: Colors.grey),
+ maxLines: 1,
+ overflow: TextOverflow.ellipsis,
+ ),
+ ),
+ const SizedBox(width: 8),
+ Row(
+ mainAxisSize: MainAxisSize.min,
+ children: [
+ const Text('|', style: TextStyle(fontSize: 15, color: Colors.grey)),
+ const SizedBox(width: 8),
+ Text(
+ formatCurrency(lastExpense.amount, lastExpense.currency),
+ style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF179D8B)),
+ ),
+ ],
+ ),
+ ],
+ ),
+ const SizedBox(height: 4), // Adjusted spacing
+ Row(
+ children: [
+ const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+ const SizedBox(width: 4),
+ Text(
+ formatDateShort(lastExpense.date),
+ style: const TextStyle(fontSize: 13, color: Colors.grey),
+ ),
+ ],
+ ),
+ ],
+ );
+ }
           return const SizedBox.shrink();
-        }
-        final ExpenseModel? lastExpense = snapshot.data!['lastExpense'];
-        final group = widget.group;
-        final currency = group.currency;
 
-        return MouseRegion(
-          onEnter: (_) => setState(() => _hovering = true),
-          onExit: (_) => setState(() => _hovering = false),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeInOut,
-            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
-            decoration: BoxDecoration(
-              color: _hovering ? const Color(0xFFF2F7FA) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _hovering ? const Color(0xFF179D8B) : const Color(0xFFE6E6E6), width: 1.5),
-              boxShadow: _hovering
-                  ? [BoxShadow(color: Colors.teal.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]
-                  : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => Navigator.pushNamed(context, '/group/${group.id}'),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.teal[100],
-                        backgroundImage: (group.photoUrl != null && group.photoUrl!.isNotEmpty)
-                            ? NetworkImage(group.photoUrl!)
-                            : null,
-                        child: (group.photoUrl == null || group.photoUrl!.isEmpty)
-                            ? const Icon(Icons.group, size: 32, color: Colors.white)
-                            : null,
-                      ),
-                      const SizedBox(width: 18),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    group.name,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                // Menú de acciones adicionales (placeholder, puedes agregar más acciones aquí)
-                                PopupMenuButton<String>(
-                                  tooltip: 'Acciones de grupo',
-                                  color: Colors.white,
-                                  elevation: 8,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  offset: const Offset(0, 36),
-                                  icon: Container(
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF179D8B).withOpacity(_hovering ? 0.18 : 0.12),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      Icons.more_vert,
-                                      size: 24,
-                                      color: _hovering ? const Color(0xFF179D8B) : Colors.grey[700],
-                                    ),
-                                  ),
-                                  onSelected: (value) async {
-                                    if (value == 'edit') {
-                                      final participants = (snapshot.data!['participants'] as Map<String, UserModel>).values.toList();
-                                      await showEditGroupDialog(context, group, participants);
-                                    } else if (value == 'delete') {
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text('Eliminar grupo'),
-                                          content: const Text('¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.'),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context, false),
-                                              child: const Text('Cancelar'),
-                                            ),
-                                            ElevatedButton.icon(
-                                              icon: const Icon(Icons.delete_outline, color: Colors.white),
-                                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                              onPressed: () => Navigator.pop(context, true),
-                                              label: const Text('Eliminar'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      if (confirm == true) {
-                                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                                        final user = authProvider.user;
-                                        if (user != null) {
-                                          await Provider.of<GroupProvider>(context, listen: false).deleteGroup(group.id, user.id);
-                                          if (mounted) {
-                                            Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
-                                          }
-                                        }
-                                      }
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'edit',
-                                      child: ListTile(
-                                        leading: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
-                                        title: const Text('Editar grupo'),
-                                      ),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'delete',
-                                      child: ListTile(
-                                        leading: const Icon(Icons.delete_outline, color: Color(0xFFE14B4B)),
-                                        title: const Text('Eliminar grupo', style: TextStyle(color: Color(0xFFE14B4B))),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            FutureBuilder<double>(
-                              future: _getUserBalance(),
-                              builder: (context, balSnap) {
-                                final bal = balSnap.data ?? 0.0;
-                                final color = bal < -0.01
-                                    ? const Color(0xFFE14B4B)
-                                    : (bal > 0.01 ? const Color(0xFF1BC47D) : Colors.grey[700]);
-                                return Text(
-                                  'My balance: ${formatCurrency(bal, currency)}',
-                                  style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 16),
-                                );
-                              },
-                            ),
-                            if (lastExpense != null) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    fit: FlexFit.loose,
-                                    child: Text(
-                                      'Last expense: "${lastExpense.description}"',
-                                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text('|', style: TextStyle(fontSize: 15, color: Colors.grey)),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        formatCurrency(lastExpense.amount, lastExpense.currency),
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF179D8B)),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    formatDateShort(lastExpense.date),
-                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+ ],
+ ),
+ ),
               ),
             ),
           ),
         );
       },
-    );
-  }
-  // Helper para obtener el share del usuario en un gasto
-  static double _getUserShare(ExpenseModel exp, String userId) {
-    if (exp.splitType == 'equal') {
-      return exp.amount / exp.participantIds.length;
-    }
-    if (exp.customSplits != null) {
-      final split = exp.customSplits!.firstWhere(
-        (s) => s['userId'] == userId,
-        orElse: () => <String, dynamic>{},
-      );
-      if (split['amount'] != null) {
-        return (split['amount'] as num).toDouble();
-      }
-    }
-    return 0;
+ );
   }
 }
 
