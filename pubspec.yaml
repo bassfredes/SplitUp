@@ -32,7 +32,9 @@ dependencies:
   flutter_web_auth_2: ^4.1.0
   firebase_analytics: ^11.4.5
   firebase_app_check: ^0.3.2+5
-  fl_chart: ^0.63.0
+  fl_chart: ^1.0.0
+  shared_preferences: ^2.5.3
+  connectivity_plus: ^6.1.4
 
 dev_dependencies:
   flutter_test:

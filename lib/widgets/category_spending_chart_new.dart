@@ -417,216 +417,234 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
           maxChildSize: 0.9, // Tamaño máximo
           expand: false,
           builder: (_, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    spreadRadius: 0,
+            return Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        spreadRadius: 0,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Cabecera con el color de la categoría
-                  Container(
-                    decoration: BoxDecoration(
-                      color: categoryColor.withOpacity(0.9),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Barra de drag visual
-                        Center(
-                          child: Container(
-                            height: 5,
-                            width: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Cabecera con el color de la categoría
+                      Container(
+                        decoration: BoxDecoration(
+                          color: categoryColor.withOpacity(0.9),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                         ),
-                        const SizedBox(height: 16),
-                        // Título y botón cerrar
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Barra de drag visual
+                            Center(
+                              child: Container(
+                                height: 5,
+                                width: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Título y botón cerrar
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                // Círculo con el color de la categoría
+                                Row(
+                                  children: [
+                                    // Círculo con el color de la categoría
+                                    Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 2),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      category.isNotEmpty ? category : 'Uncategorized',
+                                      style: const TextStyle(
+                                        fontSize: 22, 
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  onPressed: () => Navigator.of(context).pop(),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Información del total y porcentaje
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Total gasto',
+                                      style: TextStyle(
+                                        fontSize: 14, 
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    Text(
+                                      formatCurrency(totalAmount, currencyCode),
+                                      style: const TextStyle(
+                                        fontSize: 24, 
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 Container(
-                                  width: 24,
-                                  height: 24,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  category.isNotEmpty ? category : 'Uncategorized',
-                                  style: const TextStyle(
-                                    fontSize: 22, 
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                  child: Text(
+                                    '$categoryPercentage% del total',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close, color: Colors.white),
-                              onPressed: () => Navigator.of(context).pop(),
-                            ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        // Información del total y porcentaje
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      ),
+                      
+                      // Lista de gastos
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: Row(
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Total gasto',
-                                  style: TextStyle(
-                                    fontSize: 14, 
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                                Text(
-                                  formatCurrency(totalAmount, currencyCode),
-                                  style: const TextStyle(
-                                    fontSize: 24, 
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '$categoryPercentage% del total',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            const Icon(Icons.receipt_long, size: 20, color: Colors.grey),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Gastos recientes (${categoryExpenses.length})',
+                              style: const TextStyle(
+                                fontSize: 16, 
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Lista de gastos
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.receipt_long, size: 20, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Gastos recientes (${categoryExpenses.length})',
-                          style: const TextStyle(
-                            fontSize: 16, 
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 24),
-                  
-                  // Lista de gastos con scroll
-                  Expanded(
-                    child: categoryExpenses.isEmpty 
-                      ? const Center(child: Text('No hay gastos registrados'))
-                      : ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        itemCount: categoryExpenses.length,
-                        itemBuilder: (context, index) {
-                          final expense = categoryExpenses[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 0.5,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: Colors.grey.shade200),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          expense.description,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      Text(
-                                        formatCurrency(expense.amount, currencyCode),
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: categoryColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      ),
+                      const Divider(height: 24),
+                      
+                      // Lista de gastos con scroll
+                      Expanded(
+                        child: categoryExpenses.isEmpty 
+                          ? const Center(child: Text('No hay gastos registrados'))
+                          : ListView.builder(
+                            controller: scrollController,
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            itemCount: categoryExpenses.length,
+                            itemBuilder: (context, index) {
+                              final expense = categoryExpenses[index];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                elevation: 0.5,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(color: Colors.grey.shade200),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            DateFormat('dd MMM, yyyy').format(expense.date),
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey.shade600,
+                                          Expanded(
+                                            child: Text(
+                                              expense.description,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
+                                          ),
+                                          Text(
+                                            formatCurrency(expense.amount, currencyCode),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: categoryColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                DateFormat('dd MMM, yyyy').format(expense.date),
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                                ),
+                              );
+                            },
+                          ),
                       ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                
+                // Botón de acción flotante
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton(
+                    onPressed: () {
+                      // Aquí se podría implementar la funcionalidad para agregar un nuevo gasto en esta categoría
+                      Navigator.of(context).pop();
+                    },
+                    backgroundColor: categoryColor,
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+              ],
             );
           },
         );

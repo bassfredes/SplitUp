@@ -10,6 +10,7 @@ class GroupProvider extends ChangeNotifier {
   bool _loading = false;
   bool _isDisposed = false; // Bandera para controlar el estado de dispose
   StreamSubscription? _userGroupsSubscription; // Para manejar la suscripción
+  DateTime _lastLoadTime = DateTime(1970); // Para controlar la frecuencia de refrescos
 
   List<GroupModel> get groups => _groups;
   bool get loading => _loading;
@@ -20,6 +21,30 @@ class GroupProvider extends ChangeNotifier {
     if (!_isDisposed) {
       notifyListeners();
     }
+
+    // Optimización: Intentar cargar primero desde la caché para respuesta inmediata
+    try {
+      final cachedGroups = await _firestoreService.getUserGroupsOnce(userId);
+      if (!_isDisposed && cachedGroups.isNotEmpty) {
+        _groups = cachedGroups;
+        _loading = false;
+        notifyListeners();
+      }
+    } catch (e) {
+      // Si hay error al cargar desde caché, continuamos con el stream
+      print("Error al cargar grupos desde caché: $e");
+    }
+
+    // Control de frecuencia: Si se cargaron datos hace menos de 30 segundos y tenemos datos,
+    // no iniciamos un nuevo stream a menos que se fuerce la recarga
+    final now = DateTime.now();
+    if (now.difference(_lastLoadTime).inSeconds < 30 && _groups.isNotEmpty) {
+      _loading = false;
+      if (!_isDisposed) notifyListeners();
+      return;
+    }
+    
+    _lastLoadTime = now;
 
     // Cancelar cualquier suscripción anterior para evitar múltiples listeners
     await _userGroupsSubscription?.cancel();

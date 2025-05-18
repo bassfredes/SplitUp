@@ -12,6 +12,7 @@ import '../providers/group_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/debt_calculator_service.dart';
 import '../services/export_service.dart';
+import '../services/firestore_service.dart';
 import '../widgets/expense_tile.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
@@ -76,27 +77,33 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<List<UserModel>> _fetchParticipantsByIds(List<String> userIds) async {
     if (userIds.isEmpty) return [];
-    // Optimization: Limit the number of IDs in the 'whereIn' query if it is too large
-    // Firestore has a limit (currently 30), but it is good practice to consider it.
-    // Split into chunks if userIds.length > 30
-    List<UserModel> allUsers = [];
-    List<List<String>> chunks = [];
-    for (var i = 0; i < userIds.length; i += 30) {
-      chunks.add(userIds.sublist(i, i + 30 > userIds.length ? userIds.length : i + 30));
-    }
+    
+    // Usar el servicio optimizado para obtener usuarios
+    final firestoreService = FirestoreService();
+    try {
+      return await firestoreService.fetchUsersByIds(userIds);
+    } catch (e) {
+      print("Error al cargar usuarios: $e");
+      // En caso de error, mantener la implementación anterior como respaldo
+      List<UserModel> allUsers = [];
+      List<List<String>> chunks = [];
+      for (var i = 0; i < userIds.length; i += 30) {
+        chunks.add(userIds.sublist(i, i + 30 > userIds.length ? userIds.length : i + 30));
+      }
 
-    for (final chunk in chunks) {
-      if (chunk.isEmpty) continue;
-      final usersSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .where(FieldPath.documentId, whereIn: chunk)
-          .get();
-      allUsers.addAll(usersSnap.docs.map((doc) => UserModel.fromMap(doc.data(), doc.id)));
-    }
+      for (final chunk in chunks) {
+        if (chunk.isEmpty) continue;
+        final usersSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        allUsers.addAll(usersSnap.docs.map((doc) => UserModel.fromMap(doc.data(), doc.id)));
+      }
 
-    // Sort users according to the original order of userIds
-    allUsers.sort((a, b) => userIds.indexOf(a.id).compareTo(userIds.indexOf(b.id)));
-    return allUsers;
+      // Sort users according to the original order of userIds
+      allUsers.sort((a, b) => userIds.indexOf(a.id).compareTo(userIds.indexOf(b.id)));
+      return allUsers;
+    }
   }
 
   Stream<List<ExpenseModel>> _getGroupExpenses(String groupId) {
@@ -550,12 +557,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
-  // Invite participant dialog as a method of the class
-  // MODIFICAR LA FIRMA PARA QUE DEVUELVA Future<UserModel?>
   Future<UserModel?> _showInviteParticipantDialog() async {
     final emailController = TextEditingController();
     String? error;
-    // USAR showDialog<UserModel> para que pueda devolver un UserModel
     return await showDialog<UserModel>(
       context: context,
       builder: (contextInner) => StatefulBuilder(
@@ -667,11 +671,68 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               width: 180,
               child: FloatingActionButton.extended(
                 heroTag: 'invite_participant',
-                backgroundColor: Colors.teal[700],
-                foregroundColor: Colors.white,
-                icon: const Icon(Icons.person_add),
-                label: const Text('Invite'),
-                onPressed: _showInviteParticipantDialog,
+                onPressed: () async {
+                  final UserModel? invitedUser = await _showInviteParticipantDialog();
+                  if (invitedUser != null) {
+                    if (!mounted) return;
+
+                    if (widget.group.participantIds.contains(invitedUser.id)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${invitedUser.name} is already a member of this group.')),
+                      );
+                      return;
+                    }
+
+                    setState(() {
+                      _participantsLoading = true;
+                    });
+
+                    try {
+                      final groupRef = FirebaseFirestore.instance.collection('groups').doc(widget.group.id);
+                      final newRole = {'uid': invitedUser.id, 'role': 'member'};
+
+                      await groupRef.update({
+                        'participantIds': FieldValue.arrayUnion([invitedUser.id]),
+                        'roles': FieldValue.arrayUnion([newRole])
+                      });
+
+                      await FirebaseAnalytics.instance.logEvent(
+                        name: 'invite_participant',
+                        parameters: {
+                          'group_id': widget.group.id,
+                          'group_name': widget.group.name,
+                          'invited_user_id': invitedUser.id,
+                        },
+                      );
+                      
+                      // Recargar participantes para actualizar la UI.
+                      // Esto asume que widget.group se actualizará si es reactivo (p.ej. de un Provider)
+                      // o que la pantalla se reconstruirá y obtendrá el groupModel actualizado.
+                      _loadParticipants();
+
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${invitedUser.name} has been added to the group.')),
+                      );
+
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error adding participant: ${e.toString()}')),
+                      );
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _participantsLoading = false;
+                        });
+                      }
+                    }
+                  }
+                },
+                label: const Text('Invite Member', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 22),
+                backgroundColor: Colors.teal[50],
+                foregroundColor: Colors.teal[800],
               ),
             ),
           ],
@@ -848,66 +909,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 },
                               ),
                               const SizedBox(height: 32),
-                              // --- ADD EXPENSE & INVITE BUTTONS (ABOVE THE LIST) ---
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final isMobile = constraints.maxWidth < 600;
-                                  return Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      FutureBuilder<List<UserModel>>(
-                                        future: _participantsFuture,
-                                        builder: (context, snapshot) {
-                                          final isDisabled = snapshot.connectionState != ConnectionState.done || snapshot.hasError || !snapshot.hasData || (snapshot.data?.isEmpty ?? true);
-                                          return ElevatedButton.icon(
-                                            icon: const Icon(Icons.add),
-                                            label: const Text('Add expense'),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: kPrimaryColor,
-                                              foregroundColor: Colors.white,
-                                              padding: isMobile ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12) : const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-                                              textStyle: const TextStyle(fontWeight: FontWeight.w600),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            ),
-                                            onPressed: isDisabled
-                                                ? null
-                                                : () {
-                                                    final users = snapshot.data!;
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (context) => AddExpenseScreen(
-                                                          groupId: group.id,
-                                                          participants: users,
-                                                          currentUserId: Provider.of<AuthProvider>(context, listen: false).user!.id,
-                                                          groupCurrency: group.currency,
-                                                          groupName: group.name,
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(width: 12),
-                                      ElevatedButton.icon(
-                                        icon: const Icon(Icons.person_add),
-                                        label: const Text('Invite participant'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.teal[50],
-                                          foregroundColor: Colors.teal[800],
-                                          padding: isMobile ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12) : const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                                          textStyle: const TextStyle(fontWeight: FontWeight.w600),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                          elevation: 0,
-                                        ),
-                                        onPressed: _showInviteParticipantDialog,
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 24),
                               // --- LIST OF EXPENSES GROUPED BY DATE WITH PAGINATION ---
                               FutureBuilder<List<UserModel>>(
                                 // Use the state's Future
@@ -1392,8 +1393,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 ),
                               ),
                               const SizedBox(height: 32),
-                              AppFooter(), // Add the AppFooter widget here
-
                             ],
                           ), // Column
                         ), // Padding
@@ -1401,6 +1400,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     }, // builder
                   ), // LayoutBuilder
                 ), // Center
+                AppFooter(), // Add AppFooter here, outside the Center/Container but inside the main Column
               ], // children de Column principal
             ), // Column principal
           ), // Material

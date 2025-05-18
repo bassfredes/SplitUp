@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import '../widgets/edit_group_dialog.dart';
 import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../providers/group_provider.dart';
@@ -27,8 +28,28 @@ class DashboardScreen extends StatelessWidget {
     if (user == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    return ChangeNotifierProvider(
-      create: (_) => GroupProvider()..loadUserGroups(user.id),
+    // Multi-provider para mantener tanto el GroupProvider como el ExpenseProvider
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => GroupProvider()..loadUserGroups(user.id),
+        ),
+        ChangeNotifierProxyProvider<GroupProvider, ExpenseProvider>(
+          create: (_) => ExpenseProvider(),
+          update: (_, groupProvider, expenseProvider) {
+            final firstGroupId = groupProvider.groups.isNotEmpty ? 
+              groupProvider.groups.first.id : null;
+            
+            if (firstGroupId != null && (expenseProvider!.currentGroupId == null || 
+                expenseProvider.currentGroupId != firstGroupId)) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                expenseProvider.loadExpenses(firstGroupId);
+              });
+            }
+            return expenseProvider!;
+          },
+        ),
+      ],
       child: const _DashboardContent(),
     );
   }
@@ -97,42 +118,6 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
 
-  Widget _buildBalanceSummary(Map<String, double> balances) {
-    print('BALANCES DEBUG: ${balances.toString()}'); // DEBUG LOG
-    if (balances.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Card(
-      margin: const EdgeInsets.only(bottom: 20),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 10),
-            ...balances.entries.map((e) {
-              final color = e.value > 0.01
-                  ? Colors.green
-                  : (e.value < -0.01 ? Colors.red : Colors.grey[700]);
-              return Row(
-                children: [
-                  Text(
-                    formatCurrency(e.value, e.key),
-                    style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 16),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(e.key, style: TextStyle(color: Colors.grey[600])),
-                ],
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildDashboardContent(String? groupId, UserModel user, GroupProvider groupProvider) {
     return Scaffold(
@@ -168,7 +153,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.95,
                     constraints: isMobile ? null : const BoxConstraints(maxWidth: 1280),
                     margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
-                    padding: EdgeInsets.all(isMobile ? 0 : 32),
+                    padding: EdgeInsets.all(isMobile ? 8 : 18),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
@@ -180,50 +165,49 @@ class _DashboardContentState extends State<_DashboardContent> {
                         ),
                       ],
                     ),
-                    child: Padding(
-                      padding: EdgeInsets.all(isMobile ? 8 : 18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 18),
-                          Center(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Información del usuario ahora dentro del contenedor
-                                Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 28,
-                                      backgroundColor: Colors.grey[300],
-                                      backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty ? NetworkImage(user.photoUrl!) : null,
-                                      child: (user.photoUrl == null || user.photoUrl!.isEmpty)
-                                          ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 24, color: Colors.white))
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 18),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-                                        if (user.email.isNotEmpty)
-                                          Text(user.email, style: const TextStyle(color: Colors.grey, fontSize: 15)),
-                                      ],
-                                    ),
-                                  ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[ // Explicitly type children list
+                        Column( // Esta columna contiene la info de usuario, balances y grupos
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Información del usuario ahora dentro del contenedor
+                            Padding( // Modificado Padding para incluir top padding y alinear con el contenido de las tarjetas inferiores
+                              padding: EdgeInsets.only(top: isMobile ? 18 : 28, left: isMobile ? 8 : 28, right: isMobile ? 8 : 28),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 28,
+                                    backgroundColor: Colors.grey[300],
+                                    backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty ? NetworkImage(user.photoUrl!) : null,
+                                    child: (user.photoUrl == null || user.photoUrl!.isEmpty)
+                                        ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 24, color: Colors.white))
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 18),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                                      if (user.email.isNotEmpty)
+                                        Text(user.email, style: const TextStyle(color: Colors.grey, fontSize: 15)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            Card(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                              elevation: 0,
+                              color: Colors.white,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isMobile ? 18 : 28,
+                                  horizontal: isMobile ? 8 : 28,
                                 ),
-                                const SizedBox(height: 18),
-                                Card(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                                  elevation: 0,
-                                  color: Colors.white,
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: isMobile ? 18 : 28,
-                                      horizontal: isMobile ? 8 : 28,
-                                    ),
-                                    child: isMobile
-                                        ? Column(
+                                child: isMobile
+                                    ? Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
@@ -336,60 +320,63 @@ class _DashboardContentState extends State<_DashboardContent> {
                                           ),
                                   ),
                                 ),
-                                const SizedBox(height: 24),
-                                Card(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                                  elevation: 0,
-                                  color: Colors.white,
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 24,
-                                      horizontal: isMobile ? 12 : 24,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('Your groups', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
-                                        const SizedBox(height: 16),
-                                        Consumer<GroupProvider>(
-                                          builder: (context, groupProvider, _) {
-                                            if (groupProvider.loading) {
-                                              return const Center(child: CircularProgressIndicator());
-                                            }
-                                            if (groupProvider.groups.isEmpty) {
-                                              return const Text('No groups yet.');
-                                            }
-                                            return Column(
-                                              children: groupProvider.groups.map((group) {
-                                                return _GroupCard(group: group, currentUserId: user.id);
-                                              }).toList(),
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Widget de gastos por categoría
-                          if (groupId != null) ...[
                             const SizedBox(height: 24),
                             Card(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                               elevation: 0,
                               color: Colors.white,
                               child: Padding(
-                                padding: const EdgeInsets.all(24.0),
-                                child: CategorySpendingChart(groupId: groupId),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: 24,
+                                  horizontal: isMobile ? 12 : 24,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Your groups', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+                                    const SizedBox(height: 16),
+                                    Consumer<GroupProvider>(
+                                      builder: (context, groupProvider, _) {
+                                        if (groupProvider.loading) {
+                                          return const Center(child: CircularProgressIndicator());
+                                        }
+                                        if (groupProvider.groups.isEmpty) {
+                                          return const Text('No groups yet.');
+                                        }
+                                        return Column(
+                                          children: groupProvider.groups.map((group) {
+                                            return _GroupCard(group: group, currentUserId: user.id);
+                                          }).toList(),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
-                        ],
-                      ),
+                        ), // Fin de la columna de contenido principal
+                        if (groupId != null)
+                          Padding( // Usar Padding para el espaciado superior
+                            padding: const EdgeInsets.only(top: 24.0),
+                            child: Builder(
+                                builder: (context) { // No es estrictamente necesario el Builder aquí si isMobile se pasa o se accede de otra forma
+                                  final chartPadding = EdgeInsets.all(isMobile ? 8 : 18);
+                                  return Card(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    elevation: 0,
+                                    color: Colors.white,
+                                    child: Padding(
+                                      padding: chartPadding,
+                                      child: CategorySpendingChart(groupId: groupId),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ),
+                      ],
                     ),
                   ),
                   const AppFooter(),
@@ -407,22 +394,13 @@ class _DashboardContentState extends State<_DashboardContent> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user!;
     final groupProvider = Provider.of<GroupProvider>(context);
-    
-    // Obtener el ID del primer grupo para cargar los gastos
+    // expenseProvider eliminado porque no se usa
+
+    // Obtener el ID del primer grupo para el gráfico
     final firstGroupId = groupProvider.groups.isNotEmpty ? groupProvider.groups.first.id : null;
-    
-    Widget content;
-    
-    if (firstGroupId != null) {
-      content = ChangeNotifierProvider<ExpenseProvider>(
-        create: (_) => ExpenseProvider()..loadExpenses(firstGroupId),
-        child: _buildDashboardContent(firstGroupId, user, groupProvider),
-      );
-    } else {
-      content = _buildDashboardContent(null, user, groupProvider);
-    }
-    
-    return content;
+
+    // Ya no necesitamos crear un nuevo provider porque ya se creó en el widget padre
+    return _buildDashboardContent(firstGroupId, user, groupProvider);
   }
 }
 
@@ -551,11 +529,88 @@ class _GroupCardState extends State<_GroupCard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              group.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    group.name,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                // Menú de acciones adicionales (placeholder, puedes agregar más acciones aquí)
+                                PopupMenuButton<String>(
+                                  tooltip: 'Acciones de grupo',
+                                  color: Colors.white,
+                                  elevation: 8,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  offset: const Offset(0, 36),
+                                  icon: Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF179D8B).withOpacity(_hovering ? 0.18 : 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      Icons.more_vert,
+                                      size: 24,
+                                      color: _hovering ? const Color(0xFF179D8B) : Colors.grey[700],
+                                    ),
+                                  ),
+                                  onSelected: (value) async {
+                                    if (value == 'edit') {
+                                      final participants = (snapshot.data!['participants'] as Map<String, UserModel>).values.toList();
+                                      await showEditGroupDialog(context, group, participants);
+                                    } else if (value == 'delete') {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('Eliminar grupo'),
+                                          content: const Text('¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context, false),
+                                              child: const Text('Cancelar'),
+                                            ),
+                                            ElevatedButton.icon(
+                                              icon: const Icon(Icons.delete_outline, color: Colors.white),
+                                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                              onPressed: () => Navigator.pop(context, true),
+                                              label: const Text('Eliminar'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (confirm == true) {
+                                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                                        final user = authProvider.user;
+                                        if (user != null) {
+                                          await Provider.of<GroupProvider>(context, listen: false).deleteGroup(group.id, user.id);
+                                          if (mounted) {
+                                            Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: ListTile(
+                                        leading: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
+                                        title: const Text('Editar grupo'),
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: ListTile(
+                                        leading: const Icon(Icons.delete_outline, color: Color(0xFFE14B4B)),
+                                        title: const Text('Eliminar grupo', style: TextStyle(color: Color(0xFFE14B4B))),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 2),
                             FutureBuilder<double>(

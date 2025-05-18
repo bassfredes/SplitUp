@@ -43,7 +43,9 @@ class ExpenseModel {
       groupId: map['groupId'] ?? '',
       description: map['description'] ?? '',
       amount: (map['amount'] ?? 0).toDouble(),
-      date: (map['date'] as Timestamp).toDate(),
+      date: map['date'] is Timestamp
+          ? (map['date'] as Timestamp).toDate()
+          : DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
       participantIds: List<String>.from(map['participantIds'] ?? []),
       payers: (map['payers'] as List<dynamic>? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))

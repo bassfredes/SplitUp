@@ -20,9 +20,19 @@ import 'screens/link_google_screen.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'config/app_check_init.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'services/cache_service.dart';
+import 'services/connectivity_service.dart';
+import 'widgets/firestore_usage_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar servicios locales primero
+  await CacheService().init();
+  final connectivityService = ConnectivityService();
+  await connectivityService.checkConnectivity();
+  
+  // Luego inicializar Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -49,12 +59,14 @@ class SplitUpApp extends StatelessWidget {
         // Agrega aquí otros providers si es necesario
       ],
       child: MaterialApp(
-        title: 'SplitUp',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          primarySwatch: Colors.teal,
-          fontFamily: 'Roboto',
-        ),
+        // Envuelve el contenido con FirestoreUsageWidget tras proveer Directionality
+        builder: (context, child) => FirestoreUsageWidget(child: child!),
+          title: 'SplitUp',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            primarySwatch: Colors.teal,
+            fontFamily: 'Roboto',
+          ),
         initialRoute: '/',
         routes: {
           '/': (context) => const RootRedirector(),
@@ -70,10 +82,12 @@ class SplitUpApp extends StatelessWidget {
         },
         navigatorObservers: [observer],
         onGenerateRoute: (settings) {
-          // Ruta dinámica para detalle de grupo
+          // Rutas dinámicas para detalle de grupo
           if (settings.name != null && settings.name!.startsWith('/group/')) {
-            final uri = Uri.parse(settings.name!); // Keep '!' here if settings.name is guaranteed non-null by the if condition
+            final uri = Uri.parse(settings.name!);
             final segments = uri.pathSegments;
+            
+            // Ruta para editar un gasto
             if (segments.length >= 5 && segments[2] == 'expense' && segments[4] == 'edit') {
               final groupId = segments[1];
               final expenseId = segments[3];
@@ -85,6 +99,8 @@ class SplitUpApp extends StatelessWidget {
                 settings: settings,
               );
             }
+            
+            // Ruta para ver detalle de un gasto
             if (segments.length >= 4 && segments[2] == 'expense') {
               final groupId = segments[1];
               final expenseId = segments[3];
@@ -96,6 +112,8 @@ class SplitUpApp extends StatelessWidget {
                 settings: settings,
               );
             }
+            
+            // Ruta para ver detalle de un grupo
             if (segments.length == 2) {
               final groupId = segments[1];
               return MaterialPageRoute(
@@ -115,6 +133,7 @@ class SplitUpApp extends StatelessWidget {
               );
             }
           }
+          
           // Rutas estáticas
           switch (settings.name) {
             case '/login':
@@ -125,8 +144,8 @@ class SplitUpApp extends StatelessWidget {
               return null;
           }
         },
-      ),
-    );
+      ), // cierra MaterialApp
+    ); // cierra MultiProvider
   }
 }
 
@@ -136,36 +155,37 @@ class RootRedirector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<firebase_auth.User?>(
-      future: Future.value(firebase_auth.FirebaseAuth.instance.currentUser), // Use Future.value for immediate value
+      future: Future.value(firebase_auth.FirebaseAuth.instance.currentUser), // Usa Future.value para valor inmediato
       builder: (context, snapshot) {
-        // It's better to handle the loading state explicitly
+        // Es mejor manejar el estado de carga explícitamente
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator())); // Show loading indicator
+          return const Scaffold(body: Center(child: CircularProgressIndicator())); // Muestra indicador de carga
         }
 
-        final user = snapshot.data; // No need for ! here, check for null below
+        final user = snapshot.data;
+        final currentRoute = ModalRoute.of(context)?.settings.name;
 
-        // Use WidgetsBinding.instance.addPostFrameCallback for navigation after build
+        // Usa WidgetsBinding.instance.addPostFrameCallback para navegación después de construir el widget
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!snapshot.hasData || user == null) {
-            // If no user data or user is null, navigate to login
-            if (ModalRoute.of(context)?.settings.name != '/login') {
-               Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+            // Si no hay datos de usuario o el usuario es nulo, navega a login
+            if (currentRoute != '/login') {
+              Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
             }
           } else if (!user.emailVerified) {
-            // If user exists but email is not verified, navigate to verification
-             if (ModalRoute.of(context)?.settings.name != '/email_verification') {
-               Navigator.pushNamedAndRemoveUntil(context, '/email_verification', (route) => false);
-             }
+            // Si el usuario existe pero el email no está verificado, navega a verificación
+            if (currentRoute != '/email_verification') {
+              Navigator.pushNamedAndRemoveUntil(context, '/email_verification', (route) => false);
+            }
           } else {
-            // If user exists and email is verified, navigate to dashboard
-            if (ModalRoute.of(context)?.settings.name != '/dashboard') {
-               Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+            // Si el usuario existe y el email está verificado, navega al dashboard
+            if (currentRoute != '/dashboard') {
+              Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
             }
           }
         });
 
-        // Return an empty container while navigation is pending
+        // Devuelve un contenedor vacío mientras la navegación está pendiente
         return const SizedBox.shrink();
       },
     );

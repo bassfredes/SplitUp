@@ -64,8 +64,17 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
                   tooltip: 'Cuenta',
                   icon: (avatarUrl != null && avatarUrl!.isNotEmpty)
                     ? CircleAvatar(
-                        backgroundImage: NetworkImage(avatarUrl!),
                         radius: isMobile ? 16 : 20,
+                        backgroundColor: Colors.grey[300],
+                        child: ClipOval(
+                          child: Image.network(
+                            avatarUrl!,
+                            width: isMobile ? 32 : 40,
+                            height: isMobile ? 32 : 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(color: Colors.grey),
+                          ),
+                        ),
                       )
                     : (displayName != null && displayName!.isNotEmpty)
                       ? CircleAvatar(
@@ -93,7 +102,19 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           (avatarUrl != null && avatarUrl!.isNotEmpty)
-                            ? CircleAvatar(backgroundImage: NetworkImage(avatarUrl!), radius: 22)
+                            ? CircleAvatar(
+                                radius: 22,
+                                backgroundColor: Colors.grey[300],
+                                child: ClipOval(
+                                  child: Image.network(
+                                    avatarUrl!,
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(color: Colors.grey),
+                                  ),
+                                ),
+                              )
                             : (displayName != null && displayName!.isNotEmpty)
                               ? CircleAvatar(
                                   backgroundColor: Colors.blue[200],
