@@ -25,7 +25,7 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
     if (password.length >= 8) score++;
     if (RegExp(r'[A-Z]').hasMatch(password)) score++;
     if (RegExp(r'[a-z]').hasMatch(password)) score++;
-    if (RegExp(r'\\d').hasMatch(password)) score++;
+    if (RegExp(r'[0-9]').hasMatch(password)) score++; // Cambiado de \\d a [0-9]
     if (RegExp(r'[!@#\$&*~]').hasMatch(password)) score++;
     setState(() {
       _passwordStrength = score / 5.0;
@@ -97,6 +97,7 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
                 ),
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction, // Para validación interactiva
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -112,7 +113,7 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen> {
                           if (value == null || value.length < 8) return 'Minimum 8 characters';
                           if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Must contain uppercase letter';
                           if (!RegExp(r'[a-z]').hasMatch(value)) return 'Must contain lowercase letter';
-                          if (!RegExp(r'\\d').hasMatch(value)) return 'Must contain number';
+                          if (!RegExp(r'[0-9]').hasMatch(value)) return 'Must contain number'; // Cambiado de \\d a [0-9]
                           if (!RegExp(r'[!@#\$&*~]').hasMatch(value)) return 'Must contain special character';
                           return null;
                         },
