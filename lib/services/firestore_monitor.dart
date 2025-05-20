@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Servicio para monitorear y registrar las operaciones de lectura de Firestore
 /// Ayuda a identificar puntos críticos de uso y verificar el éxito de las optimizaciones
-class FirestoreMonitor {
+class FirestoreMonitor extends ChangeNotifier {
   static final FirestoreMonitor _instance = FirestoreMonitor._internal();
   
   // Contadores
@@ -51,24 +51,28 @@ class FirestoreMonitor {
       print('Lecturas de Firestore: $_readCount');
     }
     _saveStats();
+    notifyListeners();
   }
   
   /// Registra una operación de escritura
   void logWrite() {
     _writeCount++;
     _saveStats();
+    notifyListeners();
   }
   
   /// Registra un acierto en la caché
   void logCacheHit() {
     _cacheHitCount++;
     _saveStats();
+    notifyListeners();
   }
   
   /// Registra un fallo en la caché
   void logCacheMiss() {
     _cacheMissCount++;
     _saveStats();
+    notifyListeners();
   }
   
   /// Guarda las estadísticas actuales antes de un reseteo
@@ -107,6 +111,7 @@ class FirestoreMonitor {
     _cacheMissCount = 0;
     _readsByCollection.clear();
     _saveStats();
+    notifyListeners();
   }
   
   /// Genera un informe de uso

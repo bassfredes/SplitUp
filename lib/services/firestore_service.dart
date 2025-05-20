@@ -23,12 +23,14 @@ class FirestoreService {
   // Grupos
   Future<void> createGroup(GroupModel group) async {
     await _db.collection('groups').doc(group.id).set(group.toMap());
+    _monitor.logWrite();
     // Invalidar caché de grupos del usuario
     await _cache.removeKeysWithPattern('user_groups_');
   }
 
   Future<void> deleteGroup(String groupId) async {
     await _db.collection('groups').doc(groupId).delete();
+    _monitor.logWrite();
     // Limpiar caché asociada al grupo eliminado
     await _cache.removeKeysWithPattern('group_${groupId}_');
     await _cache.removeData('group_$groupId');
@@ -42,6 +44,7 @@ class FirestoreService {
     final cachedGroup = _cache.getData(cacheKey);
     if (cachedGroup != null) {
       _monitor.logCacheHit();
+      _monitor.logRead('groups');
       return GroupModel.fromMap(Map<String, dynamic>.from(cachedGroup), groupId);
     }
     
@@ -73,12 +76,17 @@ class FirestoreService {
     // Intentar entregar datos desde caché inmediatamente
     final cachedData = _cache.getData('group_$groupId');
     if (cachedData != null) {
+      _monitor.logCacheHit();
+      _monitor.logRead('groups');
       controller.add(GroupModel.fromMap(Map<String, dynamic>.from(cachedData), groupId));
     }
     
     // Suscribirse a cambios remotos
     final subscription = _db.collection('groups').doc(groupId).snapshots().listen(
       (doc) {
+        if (!doc.metadata.isFromCache) {
+          _monitor.logRead('groups');
+        }
         if (doc.exists && doc.data() != null) {
           final group = GroupModel.fromMap(doc.data()!, doc.id);
           // Actualizar caché
@@ -105,10 +113,14 @@ class FirestoreService {
     // Verificar caché primero
     final cachedGroups = _cache.getGroupsFromCache(userId);
     if (cachedGroups != null) {
+      _monitor.logCacheHit();
+      _monitor.logRead('groups');
       return cachedGroups;
     }
     
+    _monitor.logCacheMiss();
     // Si no está en caché, obtener de Firestore
+    _monitor.logRead('groups');
     final snapshot = await _db.collection('groups')
       .where('participantIds', arrayContains: userId)
       .get();
@@ -134,6 +146,8 @@ class FirestoreService {
     // Intenta entregar datos desde caché inmediatamente
     final cachedGroups = _cache.getGroupsFromCache(userId);
     if (cachedGroups != null) {
+      _monitor.logCacheHit();
+      _monitor.logRead('groups');
       controller.add(cachedGroups);
     }
     
@@ -142,6 +156,9 @@ class FirestoreService {
       .where('participantIds', arrayContains: userId)
       .snapshots()
       .listen((snapshot) {
+        if (!snapshot.metadata.isFromCache) {
+          _monitor.logRead('groups');
+        }
         final groups = snapshot.docs
           .map((doc) => GroupModel.fromMap(doc.data(), doc.id)).toList();
         // Actualizar caché
@@ -162,6 +179,7 @@ class FirestoreService {
   Future<void> addExpense(ExpenseModel expense) async {
     await _db.collection('groups').doc(expense.groupId)
       .collection('expenses').doc(expense.id).set(expense.toMap());
+    _monitor.logWrite();
     // Invalidar caché de gastos
     await _cache.removeData('group_expenses_${expense.groupId}');
   }
@@ -173,6 +191,7 @@ class FirestoreService {
         .collection('expenses')
         .doc(expense.id)
         .update(expense.toMap());
+    _monitor.logWrite();
     // Invalidar caché de gastos
     await _cache.removeData('group_expenses_${expense.groupId}');
   }
@@ -183,6 +202,7 @@ class FirestoreService {
     final cachedExpenses = _cache.getExpensesFromCache(groupId);
     if (cachedExpenses != null) {
       _monitor.logCacheHit();
+      _monitor.logRead('expenses');
       return cachedExpenses;
     }
     
@@ -217,6 +237,8 @@ class FirestoreService {
     // Intentar entregar datos desde caché inmediatamente
     final cachedExpenses = _cache.getExpensesFromCache(groupId);
     if (cachedExpenses != null) {
+      _monitor.logCacheHit();
+      _monitor.logRead('expenses');
       controller.add(cachedExpenses);
     }
     
@@ -226,6 +248,9 @@ class FirestoreService {
       .orderBy('date', descending: true)
       .snapshots()
       .listen((snapshot) {
+        if (!snapshot.metadata.isFromCache) {
+          _monitor.logRead('expenses');
+        }
         final expenses = snapshot.docs
           .map((doc) => ExpenseModel.fromMap(doc.data(), doc.id)).toList();
         // Actualizar caché
@@ -260,7 +285,7 @@ class FirestoreService {
     }
     
     final snapshot = await query.get();
-    
+    _monitor.logRead('expenses');
     return snapshot.docs
         .map((doc) => ExpenseModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
@@ -274,13 +299,14 @@ class FirestoreService {
         .collection('expenses')
         .count()
         .get();
-        
+    _monitor.logRead('expenses');
     return snapshot.count ?? 0;
   }
 
   // Elimina un participante de todos los gastos del grupo y ajusta los montos
   Future<void> removeParticipantFromExpenses(String groupId, String userId) async {
     final expensesSnap = await _db.collection('groups').doc(groupId).collection('expenses').get();
+    _monitor.logRead('expenses');
     for (final doc in expensesSnap.docs) {
       final expense = ExpenseModel.fromMap(doc.data(), doc.id);
       if (!expense.participantIds.contains(userId)) continue;
@@ -300,6 +326,7 @@ class FirestoreService {
         'customSplits': newCustomSplits,
         'amount': newAmount,
       });
+      _monitor.logWrite();
     }
   }
 
@@ -307,6 +334,7 @@ class FirestoreService {
   Future<void> addSettlement(SettlementModel settlement) async {
     await _db.collection('groups').doc(settlement.groupId)
       .collection('settlements').doc(settlement.id).set(settlement.toMap());
+    _monitor.logWrite();
     // Invalidar caché de liquidaciones
     await _cache.removeData('group_settlements_${settlement.groupId}');
   }
@@ -316,10 +344,13 @@ class FirestoreService {
     // Verificar caché primero
     final cachedSettlements = _cache.getSettlementsFromCache(groupId);
     if (cachedSettlements != null) {
+      _monitor.logCacheHit();
+      _monitor.logRead('settlements');
       return cachedSettlements;
     }
-    
+    _monitor.logCacheMiss();
     // Si no está en caché, obtener de Firestore
+    _monitor.logRead('settlements');
     final snapshot = await _db.collection('groups').doc(groupId)
       .collection('settlements')
       .orderBy('date', descending: true)
@@ -341,6 +372,8 @@ class FirestoreService {
     // Intentar entregar datos desde caché inmediatamente
     final cachedSettlements = _cache.getSettlementsFromCache(groupId);
     if (cachedSettlements != null) {
+      _monitor.logCacheHit();
+      _monitor.logRead('settlements');
       controller.add(cachedSettlements);
     }
     
@@ -350,6 +383,9 @@ class FirestoreService {
       .orderBy('date', descending: true)
       .snapshots()
       .listen((snapshot) {
+        if (!snapshot.metadata.isFromCache) {
+          _monitor.logRead('settlements');
+        }
         final settlements = snapshot.docs
           .map((doc) => SettlementModel.fromMap(doc.data(), doc.id)).toList();
         // Actualizar caché
@@ -369,12 +405,16 @@ class FirestoreService {
   // Limpia todos los gastos y liquidaciones de un grupo (antes de eliminarlo)
   Future<void> cleanGroupExpensesAndSettlements(String groupId) async {
     final expensesSnap = await _db.collection('groups').doc(groupId).collection('expenses').get();
+    _monitor.logRead('expenses');
     for (final doc in expensesSnap.docs) {
       await doc.reference.delete();
+      _monitor.logWrite();
     }
     final settlementsSnap = await _db.collection('groups').doc(groupId).collection('settlements').get();
+    _monitor.logRead('settlements');
     for (final doc in settlementsSnap.docs) {
       await doc.reference.delete();
+      _monitor.logWrite();
     }
     
     // Limpiar caché relacionada
@@ -389,6 +429,8 @@ class FirestoreService {
     // Comprobar primero en la caché
     final cachedUsers = _cache.getUsersFromCache(userIds);
     if (cachedUsers != null && cachedUsers.length == userIds.length) {
+      _monitor.logCacheHit();
+      _monitor.logRead('users');
       return cachedUsers;
     }
     
@@ -403,8 +445,12 @@ class FirestoreService {
     
     // Si no hay IDs faltantes, devolver los usuarios en caché
     if (missingIds.isEmpty && cachedUsers != null) {
+      _monitor.logCacheHit();
+      _monitor.logRead('users');
       return cachedUsers;
     }
+    
+    _monitor.logCacheMiss();
     
     // Firestore tiene un límite de 30 IDs por consulta whereIn
     List<UserModel> allUsers = cachedUsers ?? [];
@@ -421,7 +467,7 @@ class FirestoreService {
           .collection('users')
           .where(FieldPath.documentId, whereIn: chunk)
           .get();
-          
+      _monitor.logRead('users');
       final fetchedUsers = usersSnap.docs
           .map((doc) => UserModel.fromMap(doc.data(), doc.id))
           .toList();
@@ -450,7 +496,8 @@ class FirestoreService {
       batch.update(docRef, update['data'] as Map<String, dynamic>);
     }
     
-    return batch.commit();
+    await batch.commit();
+    _monitor.logWrite();
   }
   
   /// Crea varios documentos en una sola operación atómica
@@ -466,7 +513,8 @@ class FirestoreService {
       batch.set(docRef, create['data'] as Map<String, dynamic>);
     }
     
-    return batch.commit();
+    await batch.commit();
+    _monitor.logWrite();
   }
   
   /// Elimina varios documentos en una sola operación atómica
@@ -482,6 +530,7 @@ class FirestoreService {
       batch.delete(docRef);
     }
     
-    return batch.commit();
+    await batch.commit();
+    _monitor.logWrite();
   }
 }

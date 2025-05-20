@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/firestore_monitor.dart';
+import 'package:flutter/scheduler.dart'; // Importar SchedulerBinding
 
 /// Widget para mostrar el uso de Firestore en modo desarrollo
 /// Útil para diagnosticar problemas de exceso de lecturas
@@ -20,6 +21,29 @@ class FirestoreUsageWidget extends StatefulWidget {
 class _FirestoreUsageWidgetState extends State<FirestoreUsageWidget> {
   final FirestoreMonitor _monitor = FirestoreMonitor();
   bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _monitor.addListener(_onMonitorUpdate);
+  }
+
+  @override
+  void dispose() {
+    _monitor.removeListener(_onMonitorUpdate);
+    super.dispose();
+  }
+
+  void _onMonitorUpdate() {
+    if (mounted) {
+      // Usar addPostFrameCallback para evitar llamar a setState durante el build
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) { // Comprobar de nuevo por si el widget se desmontó mientras tanto
+          setState(() {});
+        }
+      });
+    }
+  }
   
   @override
   Widget build(BuildContext context) {

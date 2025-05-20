@@ -6,6 +6,7 @@ import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
 import '../config/category_colors.dart';
 import '../utils/formatters.dart'; // Importar formatters
+import '../providers/group_provider.dart'; // Añadir esta
 
 class CategorySpendingChart extends StatefulWidget {
   final String? groupId;
@@ -21,6 +22,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
   DateTimeRange? _customDateRange;
   bool _initialRenderComplete = false; // Nueva bandera
   bool _isDropdownHovered = false; // Variable para el estado hover del Dropdown
+  String? _selectedGroupIdInChart; // Nuevo: para el grupo seleccionado en el gráfico
 
   final Map<String, String> _periods = {
     'this_month': 'This month',
@@ -29,15 +31,35 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
   };
 
   @override
-  void initState() { // Nuevo método initState
+  void initState() {
     super.initState();
+    _selectedGroupIdInChart = widget.groupId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        // Cargar gastos para el grupo inicial seleccionado si existe
+        if (_selectedGroupIdInChart != null) {
+          Provider.of<ExpenseProvider>(context, listen: false).loadExpenses(_selectedGroupIdInChart!);
+        }
         setState(() {
           _initialRenderComplete = true;
         });
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(CategorySpendingChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.groupId != oldWidget.groupId) {
+      setState(() {
+        _selectedGroupIdInChart = widget.groupId;
+        _selectedPeriod = 'this_month';
+        _customDateRange = null;
+      });
+      if (_selectedGroupIdInChart != null) {
+         Provider.of<ExpenseProvider>(context, listen: false).loadExpenses(_selectedGroupIdInChart!);
+      }
+    }
   }
 
   @override
@@ -101,97 +123,141 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final groupProvider = Provider.of<GroupProvider>(context, listen: false); // Para acceder a los grupos
+    final availableGroups = groupProvider.groups;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Category Spending',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        MouseRegion(
-          onEnter: (_) => setState(() => _isDropdownHovered = true),
-          onExit: (_) => setState(() => _isDropdownHovered = false),
-          child: Theme( // Envolver con Theme para anular todos los colores de estados del DropdownButton
-            data: Theme.of(context).copyWith(
-              hoverColor: Colors.transparent,
-              focusColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              // Ajustamos todos los colores que podrían afectar la apariencia después del clic
-              buttonTheme: const ButtonThemeData(
-                materialTapTargetSize: MaterialTapTargetSize.padded,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Category Spending',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-              decoration: BoxDecoration(
-                color: _isDropdownHovered ? Colors.teal.withOpacity(0.05) : Colors.white, // Fondo dinámico
-                border: Border.all(
-                  color: _isDropdownHovered ? Colors.teal : Colors.grey.shade300, // Borde dinámico
-                  width: 1.0,
+            MouseRegion(
+              onEnter: (_) => setState(() => _isDropdownHovered = true),
+              onExit: (_) => setState(() => _isDropdownHovered = false),
+              child: Theme( // Envolver con Theme para anular todos los colores de estados del DropdownButton
+                data: Theme.of(context).copyWith(
+                  hoverColor: Colors.transparent,
+                  focusColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  splashColor: Colors.transparent,
+                  buttonTheme: const ButtonThemeData(
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              child: DropdownButton<String>(
-                value: _selectedPeriod,
-                items: _periods.entries.map((entry) {
-                  return DropdownMenuItem<String>(
-                    value: entry.key,
-                    child: Text(entry.value),
-                  );
-                }).toList(),
-                isDense: true, // Hace que el dropdown sea más compacto
-                isExpanded: false,
-                focusColor: Colors.transparent, // Color cuando tiene foco (importante después del clic)
-                onChanged: (value) async {
-                  if (value == 'custom') {
-                    final DateTimeRange? picked = await showDateRangePicker(
-                      context: context,
-                      firstDate: DateTime(2020, 1),
-                      lastDate: DateTime(2100),
-                      initialDateRange: _customDateRange,
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        _customDateRange = picked;
-                        _selectedPeriod = value!;
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                  decoration: BoxDecoration(
+                    color: _isDropdownHovered ? Colors.teal.withOpacity(0.05) : Colors.white, // Fondo dinámico
+                    border: Border.all(
+                      color: _isDropdownHovered ? Colors.teal : Colors.grey.shade300, // Borde dinámico
+                      width: 1.0,
+                    ),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: DropdownButton<String>(
+                    value: _selectedPeriod,
+                    items: _periods.entries.map((entry) {
+                      return DropdownMenuItem<String>(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      );
+                    }).toList(),
+                    isDense: true,
+                    isExpanded: false,
+                    focusColor: Colors.transparent,
+                    onChanged: (value) async {
+                      if (value == 'custom') {
+                        final DateTimeRange? picked = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020, 1),
+                          lastDate: DateTime(2100),
+                          initialDateRange: _customDateRange,
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _customDateRange = picked;
+                            _selectedPeriod = value!;
+                          });
+                        }
+                      } else {
+                        setState(() {
+                          _selectedPeriod = value!;
+                        });
+                      }
+                    },
+                    underline: const SizedBox.shrink(),
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.teal),
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                    dropdownColor: Colors.white,
+                    iconEnabledColor: Colors.teal,
+                    iconDisabledColor: Colors.grey,
+                    elevation: 3,
+                    onTap: () {
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        if (mounted) {
+                          setState(() {
+                          });
+                        }
                       });
                     }
-                  } else {
-                    setState(() {
-                      _selectedPeriod = value!;
-                    });
-                  }
-                },
-                underline: const SizedBox.shrink(),
-                icon: const Icon(Icons.arrow_drop_down, color: Colors.teal),
-                style: const TextStyle(fontSize: 14, color: Colors.black87),
-                dropdownColor: Colors.white,
-                iconEnabledColor: Colors.teal, // Color del icono cuando está habilitado
-                iconDisabledColor: Colors.grey,
-                elevation: 3, // Elevación del menú desplegado
-                // Agregamos el callback para reset del estado hover después del clic
-                onTap: () {
-                  // Pequeño truco para asegurar que el estado se actualice correctamente después del clic
-                  Future.delayed(const Duration(milliseconds: 100), () {
-                    if (mounted) {
-                      setState(() {
-                        // Asegura que el estado hover se actualice correctamente
-                      });
-                    }
-                  });
-                }
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
+        if (availableGroups.isNotEmpty && availableGroups.length > 1) ...[ // Mostrar solo si hay más de un grupo
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Selected Group:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.grey.shade300, width: 1.0),
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                child: DropdownButton<String>(
+                  value: _selectedGroupIdInChart,
+                  items: availableGroups.map((group) {
+                    return DropdownMenuItem<String>(
+                      value: group.id,
+                      child: Text(group.name, style: const TextStyle(fontSize: 14)),
+                    );
+                  }).toList(),
+                  onChanged: (newGroupId) {
+                    if (newGroupId != null && newGroupId != _selectedGroupIdInChart) {
+                      Provider.of<ExpenseProvider>(context, listen: false).loadExpenses(newGroupId);
+                      setState(() {
+                        _selectedGroupIdInChart = newGroupId;
+                        _selectedPeriod = 'this_month'; // Resetear período
+                        _customDateRange = null;      // Resetear rango custom
+                      });
+                    }
+                  },
+                  underline: const SizedBox.shrink(),
+                  isDense: true,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  dropdownColor: Colors.white,
+                  iconEnabledColor: Colors.teal,
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
-
 
   Widget _buildChart(List<ExpenseModel> expenses) {
     final filteredExpenses = _filterExpensesByPeriod(expenses);

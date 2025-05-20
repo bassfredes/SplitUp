@@ -61,7 +61,7 @@ class SplitUpApp extends StatelessWidget {
       child: MaterialApp(
         // Envuelve el contenido con FirestoreUsageWidget tras proveer Directionality
         builder: (context, child) => FirestoreUsageWidget(child: child!),
-          title: 'SplitUp',
+          title: 'SplitUp  - Splitting up costs and managing expenses',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             primarySwatch: Colors.teal,
