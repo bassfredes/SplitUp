@@ -24,7 +24,7 @@ class LoginScreen extends StatelessWidget {
     }
     return Scaffold(
       body: Center(
-        child: SingleChildScrollView( // Envolver con SingleChildScrollView
+        child: SingleChildScrollView( 
           child: Container(
             constraints: const BoxConstraints(maxWidth: 400),
             padding: const EdgeInsets.all(32),
@@ -57,12 +57,10 @@ class LoginScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (authProvider.loading)
-                  const Center(child: CircularProgressIndicator())
-                else ...[
-                  const _EmailPasswordLoginForm(),
-                  const SizedBox(height: 24),
-                  Builder(
+                // Se elimina la condición authProvider.loading aquí
+                const _EmailPasswordLoginForm(),
+                const SizedBox(height: 24),
+                Builder(
                     builder: (context) {
                       final formState = _EmailPasswordLoginForm.of(context);
                       final isRegister = formState?._isRegister ?? false;
@@ -166,7 +164,6 @@ class LoginScreen extends StatelessWidget {
                       );
                     },
                   ),
-                ],
               ],
             ),
           ),
@@ -197,7 +194,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
   bool _isRegister = false;
   double _passwordStrength = 0;
   String _passwordStrengthLabel = '';
-  bool loading = false;
+  // bool loading = false; // Ya no se usa para la UI de carga principal del formulario
 
   @override
   void dispose() {
@@ -257,7 +254,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 8),
-                  Text(error!, style: const TextStyle(color: Colors.red)),
+                  Text(error ?? 'Unknown error', style: const TextStyle(color: Colors.red)),
                 ],
                 if (sent) ...[
                   const SizedBox(height: 8),
@@ -327,9 +324,22 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
   }
 
   Future<void> _handleSignUpOrLogin({required bool isSignUp}) async {
-    if (_formKey.currentState?.validate() ?? false) {
-      setState(() => _error = null);
-      String? error;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _error = null; 
+        // El estado de carga ahora es manejado por AuthProvider y escuchado en el build.
+      });
+    }
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    String? methodError;
+
+    // AuthProvider internamente gestionará su estado de _loading.
+    try {
       if (isSignUp) {
         if (kIsWeb) {
           final recaptchaKey = '6LfW0yUrAAAAAI7QFs_2qoY7KEHTQvhzIkNnLL13';
@@ -338,48 +348,55 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             await GRecaptchaV3.ready(recaptchaKey);
             token = await GRecaptchaV3.execute(recaptchaKey);
           } catch (e) {
-            setState(() => _error = 'Error validating reCAPTCHA: $e');
-            return;
+            methodError = 'Error validating reCAPTCHA: $e';
           }
-          if (token == null || token.isEmpty) {
-            setState(() => _error = 'Could not validate reCAPTCHA.');
-            return;
+          if (methodError == null && (token == null || token.isEmpty)) {
+            methodError = 'Could not validate reCAPTCHA.';
           }
         } else {
-          setState(() => _error = 'reCAPTCHA validation is only available on the web version.');
-          return;
+          methodError = 'reCAPTCHA validation is only available on the web version.';
         }
-        // --- END reCAPTCHA ---
-        error = await Provider.of<AuthProvider>(context, listen: false).registerWithEmail(
-          _emailController.text,
-          _passwordController.text,
-          name: _nameController.text.trim(),
-        );
-      } else {
-        // Inicio de sesión con correo y contraseña
-        error = await Provider.of<AuthProvider>(context, listen: false)
-            .signInWithEmail(_emailController.text, _passwordController.text);
         
-        if (error == null && mounted) {
-          Navigator.of(context).pushReplacementNamed('/dashboard');
+        if (methodError == null) { // Solo intentar registrar si no hay error de reCAPTCHA
+          methodError = await authProvider.registerWithEmail(
+            _emailController.text,
+            _passwordController.text,
+            name: _nameController.text.trim(),
+          );
         }
+      } else {
+        methodError = await authProvider
+            .signInWithEmail(_emailController.text, _passwordController.text);
       }
-      if (error != null) {
-        setState(() => _error = error);
-      }
+    } catch (e) {
+        methodError = 'An unexpected error occurred: ${e.toString()}';
     }
+
+    if (!mounted) return; 
+
+    if (methodError != null) {
+      setState(() {
+        _error = methodError;
+      });
+    }
+    // No es necesario setState para 'loading' aquí, el widget reaccionará a AuthProvider.
   }
 
   @override
   Widget build(BuildContext context) {
+    // Escuchar el estado de carga del AuthProvider
+    final authLoading = context.watch<AuthProvider>().loading;
+
     return Form(
       key: _formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction, // Para limpiar errores de input al escribir
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_isRegister) ...[
             TextFormField(
               controller: _nameController,
+              enabled: !authLoading, // Deshabilitar si está cargando
               decoration: InputDecoration(
                 labelText: 'Full name',
                 prefixIcon: const Icon(Icons.person_outline, color: kPrimaryColor),
@@ -393,6 +410,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
           ],
           TextFormField(
             controller: _emailController,
+            enabled: !authLoading, // Deshabilitar si está cargando
             decoration: InputDecoration(
               labelText: 'Email',
               prefixIcon: const Icon(Icons.email_outlined, color: kPrimaryColor),
@@ -405,6 +423,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
           const SizedBox(height: 12),
           TextFormField(
             controller: _passwordController,
+            enabled: !authLoading, // Deshabilitar si está cargando
             decoration: InputDecoration(
               labelText: 'Password',
               prefixIcon: const Icon(Icons.lock_outline, color: kPrimaryColor),
@@ -415,12 +434,18 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             obscureText: true,
             onChanged: _isRegister ? _checkPasswordStrength : null,
             validator: (value) {
-              if (value == null || value.length < 8) return 'Minimum 8 characters';
-              if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Must contain uppercase letter';
-              if (!RegExp(r'[a-z]').hasMatch(value)) return 'Must contain lowercase letter';
-              if (!RegExp(r'\d').hasMatch(value)) return 'Must contain number';
-              if (!RegExp(r'[!@#\$&*~]').hasMatch(value)) return 'Must contain special character';
-              return null;
+              if (!_isRegister) {
+                // Login: solo verificar si está vacío
+                return (value == null || value.isEmpty) ? 'Password is required' : null;
+              } else {
+                // Register: validación de fortaleza existente
+                if (value == null || value.length < 8) return 'Minimum 8 characters';
+                if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Must contain uppercase letter';
+                if (!RegExp(r'[a-z]').hasMatch(value)) return 'Must contain lowercase letter';
+                if (!RegExp(r'\d').hasMatch(value)) return 'Must contain number';
+                if (!RegExp(r'[!@#\$&*~]').hasMatch(value)) return 'Must contain special character';
+                return null;
+              }
             },
           ),
           if (_isRegister) ...[
@@ -442,6 +467,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _repeatPasswordController,
+              enabled: !authLoading, // Deshabilitar si está cargando
               decoration: InputDecoration(
                 labelText: 'Repeat password',
                 prefixIcon: const Icon(Icons.lock_outline, color: kPrimaryColor),
@@ -455,18 +481,20 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
           ],
           if (_error != null) ...[
             const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+            Text(_error ?? 'Unknown error', style: const TextStyle(color: Colors.red)),
           ],
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => _handleSignUpOrLogin(isSignUp: _isRegister),
+            onPressed: authLoading ? null : () => _handleSignUpOrLogin(isSignUp: _isRegister),
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimaryColor,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text(_isRegister ? 'Sign up' : 'Log in'),
+            child: authLoading 
+                   ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                   : Text(_isRegister ? 'Sign up' : 'Log in'),
           ),
           if (!_isRegister) ...[
             TextButton(
@@ -476,7 +504,7 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
             ),
           ],
           TextButton(
-            onPressed: () {
+            onPressed: authLoading ? null : () { // Deshabilitar si está cargando
               setState(() => _isRegister = !_isRegister);
             },
             style: TextButton.styleFrom(
