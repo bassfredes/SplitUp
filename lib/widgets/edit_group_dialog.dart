@@ -21,7 +21,7 @@ Future<void> showEditGroupDialog(BuildContext context, GroupModel group, List<Us
   final ImagePicker picker = ImagePicker();
   final groupRef = FirebaseFirestore.instance.collection('groups').doc(group.id);
 
-  Future<DecorationImage?> _loadGroupImageFuture(String? imagePath, String? photoUrl) async {
+  Future<DecorationImage?> loadGroupImageFuture(String? imagePath, String? photoUrl) async {
     if (imagePath != null) {
       if (kIsWeb) {
         final bytes = await XFile(imagePath).readAsBytes();
@@ -35,7 +35,7 @@ Future<void> showEditGroupDialog(BuildContext context, GroupModel group, List<Us
     return null;
   }
 
-  Future<DecorationImage?>? imageFuture = _loadGroupImageFuture(imagePath, photoUrl);
+  Future<DecorationImage?>? imageFuture = loadGroupImageFuture(imagePath, photoUrl);
   await showDialog(
     context: context,
     barrierDismissible: false,
@@ -43,7 +43,7 @@ Future<void> showEditGroupDialog(BuildContext context, GroupModel group, List<Us
       return StatefulBuilder(
         builder: (context, setStateDialog) {
           void updateImageFuture() {
-            imageFuture = _loadGroupImageFuture(imagePath, photoUrl);
+            imageFuture = loadGroupImageFuture(imagePath, photoUrl);
           }
           return Dialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -237,7 +237,7 @@ Future<void> showEditGroupDialog(BuildContext context, GroupModel group, List<Us
                                       }
                                       final url = await ref.getDownloadURL();
                                       newPhotoUrl = url;
-                                    } catch (e, st) {
+                                    } catch (e) {
                                       setStateDialog(() { uploading = false; uploadError = 'Error uploading image'; });
                                       return;
                                     }

@@ -343,7 +343,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
                 ),
               ),
               Text(
-                '${percentage}%',
+                '$percentage%',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
             ],
@@ -403,7 +403,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
       return PieChartSectionData(
         color: getCategoryColor(data.category),
         value: data.amount,
-        title: '${percentage}%',
+        title: '$percentage%',
         radius: radius,
         titleStyle: const TextStyle(
           fontSize: fontSize,

@@ -2,32 +2,41 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/expense_model.dart';
 import '../models/settlement_model.dart';
 import '../models/user_model.dart';
 
 class ExportService {
-  // Exporta gastos a CSV
-  Future<File> exportExpensesToCsv(List<ExpenseModel> expenses, String filePath) async {
+  // Exporta gastos a CSV y devuelve el contenido como String
+  String exportExpensesToCsv(List<ExpenseModel> expenses, List<UserModel> users, String groupName) {
     final List<List<dynamic>> rows = [
       [
-        'ID', 'Descripción', 'Monto', 'Fecha', 'Pagadores', 'Participantes', 'Categoría', 'Recurrente', 'Bloqueado'
+        'ID', 'Descripción', 'Monto', 'Moneda', 'Fecha', 'Pagadores (email:monto)', 'Participantes (emails)', 'Categoría', 'Recurrente', 'Bloqueado'
       ],
-      ...expenses.map((e) => [
-        e.id,
-        e.description,
-        e.amount,
-        e.date.toIso8601String(),
-        e.payers.toString(),
-        e.participantIds.join(','),
-        e.category ?? '',
-        e.isRecurring,
-        e.isLocked
-      ])
+      ...expenses.map((e) {
+        final idToEmail = {for (var u in users) u.id: u.email};
+        final payersStr = e.payers.map((p) {
+          final email = idToEmail[p['userId']] ?? p['userId'];
+          final monto = (p['amount'] is double) ? (p['amount'] as double).toStringAsFixed(2) : p['amount'].toString();
+          return '$email:$monto';
+        }).join(';');
+        final participantsStr = e.participantIds.map((id) => idToEmail[id] ?? id).join(';');
+        return [
+          e.id,
+          e.description,
+          e.amount.toStringAsFixed(2),
+          e.currency,
+          e.date.toIso8601String(),
+          payersStr,
+          participantsStr,
+          e.category ?? '',
+          e.isRecurring ? 'Sí' : 'No',
+          e.isLocked ? 'Sí' : 'No'
+        ];
+      })
     ];
-    String csv = const ListToCsvConverter().convert(rows);
-    final file = File(filePath);
-    return file.writeAsString(csv);
+    return const ListToCsvConverter().convert(rows);
   }
 
   // Exporta liquidaciones a CSV
@@ -108,128 +117,59 @@ class ExportService {
   // Importa gastos desde CSV usando emails, con validaciones
   Future<Map<String, dynamic>> importExpensesFromCsvWithValidation(File file, List<UserModel> users, String groupId) async {
     final content = await file.readAsString();
-    final rows = const CsvToListConverter(eol: '\n').convert(content);
-    if (rows.isEmpty || rows[0].length < 9) {
-      return {'expenses': [], 'errors': ['El archivo CSV no tiene el formato esperado.']};
-    }
-    final idByEmail = {for (var u in users) u.email: u.id};
-    final Set<String> emailsGrupo = idByEmail.keys.toSet();
-    final List<ExpenseModel> validExpenses = [];
-    final List<String> errors = [];
-    for (int row = 1; row < rows.length; row++) {
-      final cells = rows[row];
-      String getCell(int idx) => (idx < cells.length && cells[idx] != null) ? cells[idx].toString().trim() : '';
-      final desc = getCell(0);
-      final amountStr = getCell(1);
-      final currency = getCell(2);
-      final dateStr = getCell(3);
-      final payersStr = getCell(4);
-      final participantsStr = getCell(5);
-      final category = getCell(6);
-      final isRecurring = getCell(7) == 'Sí';
-      final isLocked = getCell(8) == 'Sí';
-      // Validaciones
-      if (desc.isEmpty) {
-        errors.add('Fila ${row + 1}: Descripción vacía.');
-        continue;
-      }
-      final amount = int.tryParse(amountStr.replaceAll('.', '').replaceAll(',', ''))?.toDouble();
-      if (amount == null || amount <= 0) {
-        errors.add('Fila ${row + 1}: Monto inválido o no positivo.');
-        continue;
-      }
-      if (currency.isEmpty) {
-        errors.add('Fila ${row + 1}: Moneda vacía.');
-        continue;
-      }
-      final date = DateTime.tryParse(dateStr);
-      if (date == null) {
-        errors.add('Fila ${row + 1}: Fecha inválida.');
-        continue;
-      }
-      // Pagadores
-      final payers = <Map<String, dynamic>>[];
-      bool payersValid = true;
-      if (payersStr.isEmpty) {
-        errors.add('Fila ${row + 1}: Pagadores vacío.');
-        continue;
-      }
-      for (final p in payersStr.split(';')) {
-        final parts = p.split(':');
-        if (parts.length != 2) {
-          errors.add('Fila ${row + 1}: Formato de pagador inválido ($p).');
-          payersValid = false;
-          break;
-        }
-        final email = parts[0];
-        final monto = int.tryParse(parts[1].replaceAll('.', '').replaceAll(',', ''));
-        if (!emailsGrupo.contains(email)) {
-          errors.add('Fila ${row + 1}: Pagador $email no pertenece al grupo.');
-          payersValid = false;
-        }
-        if (monto == null || monto <= 0) {
-          errors.add('Fila ${row + 1}: Monto de pagador inválido ($p).');
-          payersValid = false;
-        }
-        final userId = idByEmail[email] ?? email;
-        payers.add({'userId': userId, 'amount': monto?.toDouble() ?? 0.0});
-      }
-      if (!payersValid) {
-        continue;
-      }
-      // Participantes
-      if (participantsStr.isEmpty) {
-        errors.add('Fila ${row + 1}: Participantes vacío.');
-        continue;
-      }
-      final participantIds = <String>[];
-      bool participantsValid = true;
-      for (final email in participantsStr.split(';')) {
-        if (!emailsGrupo.contains(email)) {
-          errors.add('Fila ${row + 1}: Participante $email no pertenece al grupo.');
-          participantsValid = false;
-        } else {
-          participantIds.add(idByEmail[email]!);
-        }
-      }
-      if (!participantsValid) {
-        continue;
-      }
-      validExpenses.add(ExpenseModel(
-        id: '',
-        groupId: groupId,
-        description: desc,
-        amount: amount,
-        date: date,
-        participantIds: participantIds,
-        payers: payers,
-        createdBy: '',
-        category: category,
-        attachments: null,
-        splitType: 'equal',
-        customSplits: null,
-        isRecurring: isRecurring,
-        recurringRule: null,
-        isLocked: isLocked,
-        currency: currency,
-      ));
-    }
-    return {'expenses': validExpenses, 'errors': errors};
+    return await importExpensesFromCsvContentWithValidation(content, users, groupId);
   }
 
   // Importa gastos desde CSV usando emails, con validaciones (por contenido String, para web)
   Future<Map<String, dynamic>> importExpensesFromCsvContentWithValidation(String content, List<UserModel> users, String groupId) async {
-    final rows = const CsvToListConverter(eol: '\n').convert(content);
-    if (rows.isEmpty || rows[0].length < 9) {
-      return {'expenses': [], 'errors': ['El archivo CSV no tiene el formato esperado.']};
+    final List<List<dynamic>> rowsAsListOfValues = const CsvToListConverter(eol: '\n', shouldParseNumbers: false).convert(content);
+
+    final List<String> errors = [];
+    final List<ExpenseModel> validExpenses = [];
+
+    // Encabezados esperados
+    final List<String> expectedHeaders = [
+      'Descripción', 'Monto', 'Moneda', 'Fecha', 
+      'Pagadores (email:monto)', 'Participantes (emails)', 
+      'Categoría', 'Recurrente', 'Bloqueado'
+    ];
+
+    if (rowsAsListOfValues.isEmpty) {
+      return {'expenses': [], 'errors': ['El archivo CSV está vacío.']};
     }
+
+    final List<String> headers = rowsAsListOfValues[0].map((e) => e.toString().trim()).toList();
+    if (headers.length < expectedHeaders.length) {
+      errors.add('El CSV no tiene suficientes columnas. Se esperaban ${expectedHeaders.length} pero se encontraron ${headers.length}.');
+      return {'expenses': [], 'errors': errors};
+    }
+
+    bool headersMatch = true;
+    for (int i = 0; i < expectedHeaders.length; i++) {
+      if (headers[i].toLowerCase() != expectedHeaders[i].toLowerCase()) {
+        headersMatch = false;
+        break;
+      }
+    }
+
+    if (!headersMatch) {
+      errors.add('Los encabezados del CSV no coinciden con el formato esperado. Verifique que sean: ${expectedHeaders.join(", ")}');
+      return {'expenses': [], 'errors': errors};
+    }
+    
     final idByEmail = {for (var u in users) u.email: u.id};
     final Set<String> emailsGrupo = idByEmail.keys.toSet();
-    final List<ExpenseModel> validExpenses = [];
-    final List<String> errors = [];
-    for (int row = 1; row < rows.length; row++) {
-      final cells = rows[row];
-      String getCell(int idx) => (idx < cells.length && cells[idx] != null) ? cells[idx].toString().trim() : '';
+
+    for (int i = 1; i < rowsAsListOfValues.length; i++) {
+      final row = rowsAsListOfValues[i];
+      // Asegurarse de que la fila tiene suficientes celdas para evitar RangeError
+      if (row.length < expectedHeaders.length) {
+        errors.add('Fila ${i + 1}: Número de celdas (${row.length}) incorrecto, se esperaban ${expectedHeaders.length}.');
+        continue; 
+      }
+
+      String getCell(int idx) => (idx < row.length && row[idx] != null) ? row[idx].toString().trim() : '';
+
       final desc = getCell(0);
       final amountStr = getCell(1);
       final currency = getCell(2);
@@ -237,67 +177,83 @@ class ExportService {
       final payersStr = getCell(4);
       final participantsStr = getCell(5);
       final category = getCell(6);
-      final isRecurring = getCell(7) == 'Sí';
-      final isLocked = getCell(8) == 'Sí';
+      final isRecurringStr = getCell(7).toLowerCase();
+      final isLockedStr = getCell(8).toLowerCase();
+      
       // Validaciones
       if (desc.isEmpty) {
-        errors.add('Fila ${row + 1}: Descripción vacía.');
+        errors.add('Fila ${i + 1}: Descripción vacía.');
         continue;
       }
-      final amount = int.tryParse(amountStr.replaceAll('.', '').replaceAll(',', ''))?.toDouble();
+
+      final double? amount = double.tryParse(amountStr.replaceAll(',', '.'));
       if (amount == null || amount <= 0) {
-        errors.add('Fila ${row + 1}: Monto inválido o no positivo.');
+        errors.add('Fila ${i + 1}: Monto inválido o no positivo ($amountStr).');
         continue;
       }
       if (currency.isEmpty) {
-        errors.add('Fila ${row + 1}: Moneda vacía.');
+        errors.add('Fila ${i + 1}: Moneda vacía.');
         continue;
       }
       final date = DateTime.tryParse(dateStr);
       if (date == null) {
-        errors.add('Fila ${row + 1}: Fecha inválida.');
+        errors.add('Fila ${i + 1}: Fecha inválida ($dateStr).');
         continue;
       }
+
       // Pagadores
       final payers = <Map<String, dynamic>>[];
       bool payersValid = true;
       if (payersStr.isEmpty) {
-        errors.add('Fila ${row + 1}: Pagadores vacío.');
+        errors.add('Fila ${i + 1}: Pagadores vacío.');
         continue;
       }
+      double totalPaid = 0;
       for (final p in payersStr.split(';')) {
         final parts = p.split(':');
         if (parts.length != 2) {
-          errors.add('Fila ${row + 1}: Formato de pagador inválido ($p).');
+          errors.add('Fila ${i + 1}: Formato de pagador inválido ($p). Debe ser email:monto.');
           payersValid = false;
           break;
         }
-        final email = parts[0];
-        final monto = int.tryParse(parts[1].replaceAll('.', '').replaceAll(',', ''));
+        final email = parts[0].trim();
+        final montoStr = parts[1].trim();
+        final double? monto = double.tryParse(montoStr.replaceAll(',', '.'));
+
         if (!emailsGrupo.contains(email)) {
-          errors.add('Fila ${row + 1}: Pagador $email no pertenece al grupo.');
+          errors.add('Fila ${i + 1}: Pagador $email no pertenece al grupo.');
           payersValid = false;
         }
         if (monto == null || monto <= 0) {
-          errors.add('Fila ${row + 1}: Monto de pagador inválido ($p).');
+          errors.add('Fila ${i + 1}: Monto de pagador inválido ($p).');
           payersValid = false;
         }
-        final userId = idByEmail[email] ?? email;
-        payers.add({'userId': userId, 'amount': monto?.toDouble() ?? 0.0});
+        if (payersValid) {
+          final userId = idByEmail[email] ?? email; // Usar email como fallback si no se encuentra ID (aunque no debería pasar si emailsGrupo lo contiene)
+          payers.add({'userId': userId, 'amount': monto});
+          totalPaid += monto!;
+        }
       }
       if (!payersValid) {
         continue;
       }
+      // Verificar que el total pagado coincida con el monto del gasto
+      if ((totalPaid - amount).abs() > 0.01) { // Usar una pequeña tolerancia para comparaciones de doubles
+          errors.add('Fila ${i + 1}: La suma de los montos de los pagadores (${totalPaid.toStringAsFixed(2)}) no coincide con el monto del gasto (${amount.toStringAsFixed(2)}).');
+          continue;
+      }
+
       // Participantes
       if (participantsStr.isEmpty) {
-        errors.add('Fila ${row + 1}: Participantes vacío.');
+        errors.add('Fila ${i + 1}: Participantes vacío.');
         continue;
       }
       final participantIds = <String>[];
       bool participantsValid = true;
-      for (final email in participantsStr.split(';')) {
+      for (final emailRaw in participantsStr.split(';')) {
+        final email = emailRaw.trim();
         if (!emailsGrupo.contains(email)) {
-          errors.add('Fila ${row + 1}: Participante $email no pertenece al grupo.');
+          errors.add('Fila ${i + 1}: Participante $email no pertenece al grupo.');
           participantsValid = false;
         } else {
           participantIds.add(idByEmail[email]!);
@@ -306,18 +262,26 @@ class ExportService {
       if (!participantsValid) {
         continue;
       }
+      if (participantIds.isEmpty) {
+          errors.add('Fila ${i + 1}: La lista de participantes no puede estar vacía después del procesamiento.');
+          continue;
+      }
+
+      final bool isRecurring = isRecurringStr == 'sí' || isRecurringStr == 'si' || isRecurringStr == 'true';
+      final bool isLocked = isLockedStr == 'sí' || isLockedStr == 'si' || isLockedStr == 'true';
+      
       validExpenses.add(ExpenseModel(
-        id: '',
+        id: FirebaseFirestore.instance.collection('temp').doc().id, // ID temporal
         groupId: groupId,
         description: desc,
         amount: amount,
         date: date,
         participantIds: participantIds,
         payers: payers,
-        createdBy: '',
-        category: category,
+        createdBy: '', // Se debería setear el ID del usuario actual al guardar
+        category: category.isNotEmpty ? category : null,
         attachments: null,
-        splitType: 'equal',
+        splitType: 'equal', // Asumir división igualitaria para importación simple
         customSplits: null,
         isRecurring: isRecurring,
         recurringRule: null,

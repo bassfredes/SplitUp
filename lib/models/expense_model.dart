@@ -86,4 +86,42 @@ class ExpenseModel {
     if (recurringRule != null) map['recurringRule'] = recurringRule;
     return map;
   }
+
+  ExpenseModel copyWith({
+    String? id,
+    String? groupId,
+    String? description,
+    double? amount,
+    DateTime? date,
+    List<String>? participantIds,
+    List<Map<String, dynamic>>? payers,
+    String? createdBy,
+    String? category,
+    List<String>? attachments,
+    String? splitType,
+    List<Map<String, dynamic>>? customSplits,
+    bool? isRecurring,
+    String? recurringRule,
+    bool? isLocked,
+    String? currency,
+  }) {
+    return ExpenseModel(
+      id: id ?? this.id,
+      groupId: groupId ?? this.groupId,
+      description: description ?? this.description,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+      participantIds: participantIds ?? this.participantIds,
+      payers: payers ?? this.payers,
+      createdBy: createdBy ?? this.createdBy,
+      category: category ?? this.category,
+      attachments: attachments ?? this.attachments,
+      splitType: splitType ?? this.splitType,
+      customSplits: customSplits ?? this.customSplits,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurringRule: recurringRule ?? this.recurringRule,
+      isLocked: isLocked ?? this.isLocked,
+      currency: currency ?? this.currency,
+    );
+  }
 }
