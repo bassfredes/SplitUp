@@ -356,15 +356,12 @@ class _EmailPasswordLoginFormState extends State<_EmailPasswordLoginForm> {
           name: _nameController.text.trim(),
         );
       } else {
-        final navigator = Navigator.of(context);
-        final scaffoldMessenger = ScaffoldMessenger.of(context);
-        try {
-          await Provider.of<AuthProvider>(context, listen: false).signInWithEmail(_emailController.text, _passwordController.text);
-          navigator.pushReplacementNamed('/dashboard');
-        } on firebase_auth.FirebaseAuthException catch (e) {
-          scaffoldMessenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Unknown error')));
-        } catch (e) {
-          scaffoldMessenger.showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        // Inicio de sesión con correo y contraseña
+        error = await Provider.of<AuthProvider>(context, listen: false)
+            .signInWithEmail(_emailController.text, _passwordController.text);
+        
+        if (error == null && mounted) {
+          Navigator.of(context).pushReplacementNamed('/dashboard');
         }
       }
       if (error != null) {

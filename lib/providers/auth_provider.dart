@@ -63,7 +63,14 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       _loading = false;
       notifyListeners();
-      return e.toString().replaceFirst('Exception: ', '');
+      String errorMessage = e.toString().replaceFirst('Exception: ', '');
+      if (errorMessage.contains('INVALID_LOGIN_CREDENTIALS') || 
+          errorMessage.contains('invalid-credential') || 
+          errorMessage.contains('wrong-password') || 
+          errorMessage.contains('user-not-found')) {
+        return 'Credenciales incorrectas. Por favor, verifica tu correo y contraseña.';
+      }
+      return errorMessage;
     }
   }
 
