@@ -81,7 +81,7 @@ class _FirestoreUsageWidgetState extends State<FirestoreUsageWidget> {
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
+          color: Colors.black.withAlpha((0.7 * 255).round()),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -116,7 +116,7 @@ class _FirestoreUsageWidgetState extends State<FirestoreUsageWidget> {
       width: 220,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.8),
+        color: Colors.black.withAlpha((0.8 * 255).round()),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -158,7 +158,7 @@ class _FirestoreUsageWidgetState extends State<FirestoreUsageWidget> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.6),
+                color: Colors.blue.withAlpha((0.6 * 255).round()),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(

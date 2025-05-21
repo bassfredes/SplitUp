@@ -81,7 +81,7 @@ class _ExpenseTileState extends State<ExpenseTile> {
             if (categoryIcon != null)
               Container(
                 decoration: BoxDecoration(
-                  color: categoryColor.withOpacity(0.13),
+                  color: categoryColor.withAlpha((0.13 * 255).round()),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 padding: const EdgeInsets.all(8),
@@ -144,15 +144,14 @@ class _ExpenseTileState extends State<ExpenseTile> {
         curve: Curves.easeInOut,
         margin: margin,
         decoration: BoxDecoration(
-          color: _hovering ? categoryColor.withOpacity(0.08) : Colors.white,
-          borderRadius: borderRadius,
+ color: _hovering ? categoryColor.withAlpha((0.08 * 255).round()) : Colors.white,
           border: Border.all(
-            color: _hovering ? categoryColor : categoryColor.withOpacity(0.35),
+            color: _hovering ? categoryColor : categoryColor.withAlpha((0.35 * 255).round()),
             width: 1.5,
-          ),
+),
           boxShadow: _hovering
-              ? [BoxShadow(color: categoryColor.withOpacity(0.13), blurRadius: isMobile ? 8 : 16, offset: const Offset(0, 4))]
-              : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: isMobile ? 4 : 8, offset: const Offset(0, 2))],
+? [BoxShadow(color: categoryColor.withAlpha((0.13 * 255).round()), blurRadius: isMobile ? 8 : 16, offset: const Offset(0, 4))]
+: [BoxShadow(color: Colors.black.withAlpha((0.03 * 255).round()), blurRadius: isMobile ? 4 : 8, offset: const Offset(0, 2))],
         ),
         child: Material(
           color: Colors.transparent,

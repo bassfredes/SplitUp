@@ -94,7 +94,7 @@ Future<void> showEditGroupDialog(BuildContext context, GroupModel group, List<Us
                                       image: snapshot.data,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.08),
+                                        color: Colors.black.withAlpha((0.08 * 255).round()),
                                           blurRadius: 12,
                                           offset: const Offset(0, 4),
                                         ),
@@ -116,7 +116,7 @@ Future<void> showEditGroupDialog(BuildContext context, GroupModel group, List<Us
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.15),
+                                      color: Colors.black.withAlpha((0.15 * 255).round()),
                                       blurRadius: 6,
                                     ),
                                   ],

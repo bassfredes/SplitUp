@@ -25,5 +25,5 @@ Color getCategoryColor(String category) {
   if (color != null) return color;
   // Si no hay un color definido, generar uno basado en el hash del nombre
   final hash = category.hashCode;
-  return Color(0xFF000000 + (hash & 0x00FFFFFF)).withOpacity(0.7);
+  return Color(0xFF000000 + (hash & 0x00FFFFFF)).withAlpha((0.7 * 255).round());
 }

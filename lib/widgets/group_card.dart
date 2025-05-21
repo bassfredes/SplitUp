@@ -135,8 +135,8 @@ class _GroupCardState extends State<GroupCard> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: _hovering ? const Color(0xFF179D8B) : const Color(0xFFE6E6E6), width: 1.5), // Adjusted
               boxShadow: _hovering // Adjusted
-                  ? [BoxShadow(color: Colors.teal.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))]
-                  : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
+                  ? [BoxShadow(color: Colors.teal.withAlpha((0.10 * 255).round()), blurRadius: 16, offset: const Offset(0, 4))]
+                  : [BoxShadow(color: Colors.black.withAlpha((0.03 * 255).round()), blurRadius: 8, offset: const Offset(0, 2))],
             ),
             child: Material(
               color: Colors.transparent,
@@ -184,7 +184,7 @@ class _GroupCardState extends State<GroupCard> {
                                   icon: Container( // Adjusted icon
                                     padding: const EdgeInsets.all(4), // Added padding for better touch area and visual
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF179D8B).withOpacity(_hovering ? 0.18 : 0.12),
+                                      color: const Color(0xFF179D8B).withAlpha(((_hovering ? 0.18 : 0.12) * 255).round()),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Icon(

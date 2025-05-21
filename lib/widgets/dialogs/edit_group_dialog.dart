@@ -95,7 +95,7 @@ void showEditGroupDialog(BuildContext context, GroupModel group, List<UserModel>
                                     image: snapshot.data,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.08),
+                                        color: Colors.black.withAlpha((0.08 * 255).round()),
                                         blurRadius: 12,
                                         offset: const Offset(0, 4),
                                       ),
@@ -117,7 +117,7 @@ void showEditGroupDialog(BuildContext context, GroupModel group, List<UserModel>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.15),
+                                    color: Colors.black.withAlpha((0.15 * 255).round()),
                                     blurRadius: 6,
                                   ),
                                 ],

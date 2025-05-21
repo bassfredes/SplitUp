@@ -128,7 +128,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
               decoration: BoxDecoration(
-                color: _isDropdownHovered ? Colors.teal.withOpacity(0.05) : Colors.white, // Fondo dinámico
+                color: _isDropdownHovered ? Colors.teal.withAlpha((0.05 * 255).round()) : Colors.white, // Fondo dinámico
                 border: Border.all(
                   color: _isDropdownHovered ? Colors.teal : Colors.grey.shade300, // Borde dinámico
                   width: 1.0,
@@ -425,7 +425,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+ color: Colors.black.withAlpha((0.1 * 255).round()),
                         blurRadius: 10,
                         spreadRadius: 0,
                       ),
@@ -438,7 +438,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
                       // Cabecera con el color de la categoría
                       Container(
                         decoration: BoxDecoration(
-                          color: categoryColor.withOpacity(0.9),
+ color: categoryColor.withAlpha((0.9 * 255).round()),
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -451,7 +451,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
                                 height: 5,
                                 width: 40,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.5),
+ color: Colors.white.withAlpha((0.5 * 255).round()),
                                   borderRadius: BorderRadius.circular(5),
                                 ),
                               ),
@@ -518,7 +518,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+ color: Colors.white.withAlpha((0.2 * 255).round()),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(

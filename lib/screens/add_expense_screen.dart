@@ -53,7 +53,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.07),
+                          color: Colors.black.withAlpha((0.07 * 255).round()),
                           blurRadius: isMobile ? 8 : 24,
                           offset: const Offset(0, 8),
                         ),
