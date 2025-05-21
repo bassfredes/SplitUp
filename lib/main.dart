@@ -19,27 +19,82 @@ import 'screens/create_password_screen.dart';
 import 'screens/link_google_screen.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'config/app_check_init.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode; // Añadido kDebugMode
+import 'package:flutter/scheduler.dart'; // Añadido para SchedulerBinding
 import 'services/cache_service.dart';
 import 'services/connectivity_service.dart';
 import 'widgets/firestore_usage_widget.dart';
+import 'package:firebase_app_check/firebase_app_check.dart'; // Importación para FirebaseAppCheck
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Luego inicializar Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await initializeAppCheck(); // Inicializa y ACTIVA App Check
   
-  // Inicializar servicios locales primero
   await CacheService().init();
   final connectivityService = ConnectivityService();
   await connectivityService.checkConnectivity();
-  
-  // Luego inicializar Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  await initializeAppCheck(); // Inicializa App Check
+
+  // Escuchar cambios en el token de App Check
+  // Ahora es seguro configurar este listener porque App Check ya está activado
+  FirebaseAppCheck.instance.onTokenChange.listen((token) {
+    if (kDebugMode) {
+      print('App Check token changed: ${token ?? "null"}');
+    }
+  });
+
+  // Escuchar cambios en el estado de autenticación y token de ID
+  firebase_auth.FirebaseAuth.instance.authStateChanges().listen((firebase_auth.User? user) {
+    if (kDebugMode) {
+      print('Auth state changed: User is ${user == null ? "null" : user.uid}');
+    }
+  });
+
+  firebase_auth.FirebaseAuth.instance.idTokenChanges().listen((firebase_auth.User? user) {
+    if (user == null) {
+      if (kDebugMode) {
+        print('ID token changed: User is null');
+      }
+    } else {
+      user.getIdToken(true).then((token) {
+        if (kDebugMode) {
+          print('ID token changed: User ${user.uid}, New ID Token: ${token ?? "null"}');
+        }
+      }).catchError((e) {
+        if (kDebugMode) {
+          print('Error getting ID token on change: $e');
+        }
+      });
+    }
+  });
+
   // Configura la persistencia de sesión para web
   if (kIsWeb) {
-    await firebase_auth.FirebaseAuth.instance.setPersistence(firebase_auth.Persistence.LOCAL);
+    // Intenta "calentar" App Check obteniendo un token ANTES de setPersistence
+    try {
+      final String? token = await FirebaseAppCheck.instance.getToken(true); // true fuerza el refresco
+      if (kDebugMode) {
+        print('App Check token obtained explicitly in main (before persistence): ${token != null ? "OK (token: $token)" : "Failed or Null"}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error explicitly getting App Check token in main (before persistence): $e');
+      }
+    }
+
+    try {
+      await firebase_auth.FirebaseAuth.instance.setPersistence(firebase_auth.Persistence.LOCAL);
+      if (kDebugMode) {
+        print("Firebase Auth persistence set to LOCAL successfully for web.");
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error setting Firebase Auth persistence for web: $e");
+      }
+    }
   }
   runApp(const SplitUpApp());
 }
@@ -154,39 +209,115 @@ class RootRedirector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<firebase_auth.User?>(
-      future: Future.value(firebase_auth.FirebaseAuth.instance.currentUser), // Usa Future.value para valor inmediato
+    return StreamBuilder<firebase_auth.User?>(
+      stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Es mejor manejar el estado de carga explícitamente
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator())); // Muestra indicador de carga
+          if (kDebugMode) {
+            print("RootRedirector: ConnectionState.waiting - mostrando loader inicial.");
+          }
+          return const Scaffold(body: Center(child: CircularProgressIndicator(key: Key("root_initial_loader"))));
         }
 
         final user = snapshot.data;
-        final currentRoute = ModalRoute.of(context)?.settings.name;
+        
+        // Usar addPostFrameCallback para la navegación después de que el frame actual se construya.
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) {
+            if (kDebugMode) {
+              print("RootRedirector: Contexto no montado en addPostFrameCallback. Abortando navegación.");
+            }
+            return;
+          }
 
-        // Usa WidgetsBinding.instance.addPostFrameCallback para navegación después de construir el widget
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!snapshot.hasData || user == null) {
-            // Si no hay datos de usuario o el usuario es nulo, navega a login
-            if (currentRoute != '/login') {
+          final String? currentRouteName = ModalRoute.of(context)?.settings.name;
+          if (kDebugMode) {
+            print("RootRedirector: addPostFrameCallback - User: ${user?.uid}, CurrentRoute: $currentRouteName");
+          }
+
+          if (user == null) { // No hay usuario autenticado
+            // Navega a login si no está ya en /login.
+            // Asumimos que /register no es una ruta manejada por RootRedirector directamente o no existe en las rutas base.
+            if (currentRouteName != '/login') {
+              if (kDebugMode) {
+                print("RootRedirector: No hay usuario, redirigiendo a /login desde $currentRouteName");
+              }
               Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+            } else {
+              if (kDebugMode) {
+                print("RootRedirector: No hay usuario, ya en /login.");
+              }
             }
-          } else if (!user.emailVerified) {
-            // Si el usuario existe pero el email no está verificado, navega a verificación
-            if (currentRoute != '/email_verification') {
-              Navigator.pushNamedAndRemoveUntil(context, '/email_verification', (route) => false);
-            }
-          } else {
-            // Si el usuario existe y el email está verificado, navega al dashboard
-            if (currentRoute != '/dashboard') {
-              Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+          } else { // Hay un usuario autenticado
+            if (!user.emailVerified) { // Email no verificado
+              if (currentRouteName != '/email_verification') {
+                if (kDebugMode) {
+                  print("RootRedirector: Usuario con email no verificado, redirigiendo a /email_verification desde $currentRouteName");
+                }
+                Navigator.pushNamedAndRemoveUntil(context, '/email_verification', (route) => false);
+              } else {
+                 if (kDebugMode) {
+                  print("RootRedirector: Usuario con email no verificado, ya en /email_verification.");
+                }
+              }
+            } else { // Email verificado
+              // Si está en la raíz, login, o verificación, redirigir al dashboard.
+              if (currentRouteName == '/' || currentRouteName == '/login' || currentRouteName == '/email_verification') {
+                if (kDebugMode) {
+                  print("RootRedirector: Usuario verificado, redirigiendo a /dashboard desde $currentRouteName");
+                }
+                Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+              } else {
+                if (kDebugMode) {
+                  print("RootRedirector: Usuario verificado, ya en una ruta interna ($currentRouteName) o desconocida. No se redirige desde RootRedirector.");
+                }
+              }
             }
           }
         });
 
-        // Devuelve un contenedor vacío mientras la navegación está pendiente
-        return const SizedBox.shrink();
+        // Lógica para devolver un widget síncrono mientras la navegación en addPostFrameCallback se procesa.
+        final String? currentRouteNameForWidget = ModalRoute.of(context)?.settings.name;
+        if (kDebugMode) {
+          print("RootRedirector: Build síncrono - User: ${user?.uid}, CurrentRouteForWidget: $currentRouteNameForWidget");
+        }
+
+        if (user == null) {
+          if (currentRouteNameForWidget == '/login') {
+            if (kDebugMode) {
+              print("RootRedirector: Build síncrono - Devolviendo LoginScreen (ya en /login).");
+            }
+            return const LoginScreen();
+          }
+          if (kDebugMode) {
+            print("RootRedirector: Build síncrono - No hay usuario, no en /login. Devolviendo loader (esperando redirección).");
+          }
+          return const Scaffold(body: Center(child: CircularProgressIndicator(key: Key("root_user_null_loader"))));
+        } else {
+          if (!user.emailVerified) {
+            if (currentRouteNameForWidget == '/email_verification') {
+              if (kDebugMode) {
+                print("RootRedirector: Build síncrono - Devolviendo EmailVerificationScreen (ya en /email_verification).");
+              }
+              return const EmailVerificationScreen();
+            }
+            if (kDebugMode) {
+              print("RootRedirector: Build síncrono - Email no verificado, no en /email_verification. Devolviendo loader (esperando redirección).");
+            }
+            return const Scaffold(body: Center(child: CircularProgressIndicator(key: Key("root_email_not_verified_loader"))));
+          } else { // Usuario autenticado y verificado
+            if (currentRouteNameForWidget == '/' || currentRouteNameForWidget == '/login' || currentRouteNameForWidget == '/email_verification') {
+              if (kDebugMode) {
+                print("RootRedirector: Build síncrono - Usuario verificado, en ruta de pre-autenticación. Devolviendo loader (esperando redirección a dashboard).");
+              }
+              return const Scaffold(body: Center(child: CircularProgressIndicator(key: Key("root_verified_auth_path_loader"))));
+            }
+            if (kDebugMode) {
+              print("RootRedirector: Build síncrono - Usuario verificado, en ruta interna. Devolviendo SizedBox.shrink().");
+            }
+            return const SizedBox.shrink();
+          }
+        }
       },
     );
   }
