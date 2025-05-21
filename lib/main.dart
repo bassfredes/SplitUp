@@ -25,9 +25,15 @@ import 'services/cache_service.dart';
 import 'services/connectivity_service.dart';
 import 'widgets/firestore_usage_widget.dart';
 import 'package:firebase_app_check/firebase_app_check.dart'; // Importación para FirebaseAppCheck
+import 'introduction_animation/initial_screen.dart'; // Importa la nueva pantalla inicial
+import 'services/settings_service.dart'; // Importa el servicio de configuración
+import 'introduction_animation/introduction_animation_screen.dart'; // Importa la pantalla de animación de introducción
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar el servicio de configuración primero
+  await SettingsService.instance.init();
 
   // Luego inicializar Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -122,9 +128,9 @@ class SplitUpApp extends StatelessWidget {
             primarySwatch: Colors.teal,
             fontFamily: 'Roboto',
           ),
-        initialRoute: '/',
+        home: const InitialScreen(), // Cambiado a InitialScreen
+        navigatorObservers: [SplitUpApp.observer],
         routes: {
-          '/': (context) => const RootRedirector(),
           '/login': (context) => const LoginScreen(),
           '/dashboard': (context) => const DashboardScreen(),
           '/groups': (context) => const DashboardScreen(),
@@ -134,8 +140,8 @@ class SplitUpApp extends StatelessWidget {
           '/account/change_password': (context) => const ChangePasswordScreen(),
           '/account/create_password': (context) => const CreatePasswordScreen(),
           '/account/link_google': (context) => const LinkGoogleScreen(),
+          '/welcome': (context) => const IntroductionAnimationScreen(), 
         },
-        navigatorObservers: [observer],
         onGenerateRoute: (settings) {
           // Rutas dinámicas para detalle de grupo
           if (settings.name != null && settings.name!.startsWith('/group/')) {

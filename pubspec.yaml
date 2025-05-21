@@ -35,6 +35,7 @@ dependencies:
   fl_chart: ^1.0.0
   shared_preferences: ^2.5.3
   connectivity_plus: ^6.1.4
+  animations: ^2.0.11
 
 dev_dependencies:
   flutter_test:
@@ -46,6 +47,11 @@ flutter:
   assets:
     - assets/logo/logo-header.png
     - assets/icon/splitup-logo.png
+    - assets/introduction_animation/screen1.png
+    - assets/introduction_animation/screen2.png
+    - assets/introduction_animation/screen3.png
+    - assets/introduction_animation/screen4.png
+    - assets/introduction_animation/screen5.png
 
 flutter_icons:
     android: true
