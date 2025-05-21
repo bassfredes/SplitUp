@@ -1,4 +1,3 @@
-
 import 'package:splitup_application/services/settings_service.dart';
 import 'components/relax_view.dart';
 import 'components/center_next_button.dart';
@@ -37,37 +36,60 @@ class _IntroductionAnimationScreenState
 
   @override
   Widget build(BuildContext context) {
-    print(_animationController?.value);
+    bool _dragHandled = false;
     return Scaffold(
       backgroundColor: Color(0xffF7EBE1),
-      body: ClipRect(
-        child: Stack(
-          children: [
-            SplashView(
-              animationController: _animationController!,
-            ),
-            RelaxView(
-              animationController: _animationController!,
-            ),
-            ManageSmarter(
-              animationController: _animationController!,
-            ),
-            MoodDiaryVew(
-              animationController: _animationController!,
-            ),
-            WelcomeView(
-              animationController: _animationController!,
-            ),
-            TopBackSkipView(
-              onBackClick: _onBackClick,
-              onSkipClick: _onSkipClick,
-              animationController: _animationController!,
-            ),
-            CenterNextButton(
-              animationController: _animationController!,
-              onNextClick: _onNextClick,
-            ),
-          ],
+      body: GestureDetector(
+        onHorizontalDragUpdate: (details) {
+          final value = _animationController?.value ?? 0.0;
+          if (_dragHandled) return;
+          // Drag izquierda (avanzar)
+          if (details.delta.dx < -10) {
+            if (value > 0.0 && value < 0.8) {
+              _dragHandled = true;
+              _onNextClick();
+            }
+          }
+          // Drag derecha (retroceder)
+          else if (details.delta.dx > 10) {
+            if (value > 0.0) {
+              _dragHandled = true;
+              _onBackClick();
+            }
+          }
+        },
+        onHorizontalDragEnd: (_) {
+          _dragHandled = false;
+        },
+        child: ClipRect(
+          child: Stack(
+            children: [
+              SplashView(
+                animationController: _animationController!,
+              ),
+              RelaxView(
+                animationController: _animationController!,
+              ),
+              ManageSmarter(
+                animationController: _animationController!,
+              ),
+              MoodDiaryVew(
+                animationController: _animationController!,
+              ),
+              WelcomeView(
+                animationController: _animationController!,
+              ),
+              TopBackSkipView(
+                onBackClick: _onBackClick,
+                onSkipClick: _onSkipClick,
+                animationController: _animationController!,
+              ),
+              CenterNextButton(
+                animationController: _animationController!,
+                onNextClick: _onNextClick,
+              ),
+            ],
+          ),
         ),
       ),
     );
