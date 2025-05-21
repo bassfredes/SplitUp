@@ -76,7 +76,6 @@ class GroupModel {
       'roles': roles,
       'currency': currency,
       'photoUrl': photoUrl,
-      // Incluir la lista al convertir a mapa
       'participantBalances': participantBalances,
     };
   }
