@@ -36,7 +36,7 @@ void main() {
             groupId: 'group1',
             description: 'Lunch',
             amount: 30.0,
-            date: DateTime.now(),
+            date: DateTime(2023, 1, 1),
             participantIds: ['user1', 'user2', 'user3'],
             payers: [{'userId': 'user1', 'amount': 30.0}],
             createdBy: 'user1',
