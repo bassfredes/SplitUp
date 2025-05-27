@@ -256,8 +256,8 @@ void main() {
         final transactions = debtCalculatorService.simplifyDebts(balances);
         // Expected: user2 pays user3 30, user1 pays user3 20 (order might vary due to sorting)
         expect(transactions.length, 2);
-        expect(transactions.any((t) => t['from'] == 'user2' && t['to'] == 'user3' && closeTo(t['amount'] as double, 30.0)), isTrue);
-        expect(transactions.any((t) => t['from'] == 'user1' && t['to'] == 'user3' && closeTo(t['amount'] as double, 20.0)), isTrue);
+        expect(transactions.any((t) => t['from'] == 'user2' && t['to'] == 'user3' && (t['amount'] as double).isCloseTo(30.0)), isTrue);
+        expect(transactions.any((t) => t['from'] == 'user1' && t['to'] == 'user3' && (t['amount'] as double).isCloseTo(20.0)), isTrue);
       });
 
       test('One debtor, multiple creditors', () {
