@@ -60,6 +60,21 @@ class GroupModel {
       }
     }
 
+    Map<String, dynamic>? parsedLastExpense;
+    if (map['lastExpense'] != null && map['lastExpense'] is Map) {
+      parsedLastExpense = Map<String, dynamic>.from(map['lastExpense'] as Map);
+      if (parsedLastExpense['date'] is int) {
+        // Convertir int (caché) a DateTime para el modelo
+        parsedLastExpense['date'] = DateTime.fromMillisecondsSinceEpoch(parsedLastExpense['date'] as int);
+      } else if (parsedLastExpense['date'] is Timestamp) {
+        // Convertir Timestamp (Firestore) a DateTime para el modelo
+        parsedLastExpense['date'] = (parsedLastExpense['date'] as Timestamp).toDate();
+      }
+      // Si ya es DateTime o otro formato, será manejado por el constructor o podría ser un problema.
+      // Por ahora, solo manejamos explícitamente int y Timestamp del mapa.
+    }
+
+
     return GroupModel(
       id: id,
       name: map['name'] ?? '',
@@ -73,23 +88,32 @@ class GroupModel {
       participantBalances: balancesList,
       totalExpenses: (map['totalExpenses'] as num?)?.toDouble() ?? 0.0, // Parsear nuevo campo
       expensesCount: (map['expensesCount'] as num?)?.toInt() ?? 0, // Parsear nuevo campo
-      lastExpense: map['lastExpense'] == null ? null : Map<String, dynamic>.from(map['lastExpense'] as Map), // Parsear nuevo campo
+      lastExpense: parsedLastExpense, // Usar el lastExpense procesado
     );
   }
 
   Map<String, dynamic> toMap({bool forCache = false}) { // Añadido parámetro opcional
-    Map<String, dynamic>? cacheLastExpense;
+    Map<String, dynamic>? processedLastExpense;
     if (lastExpense != null) {
-      cacheLastExpense = Map<String, dynamic>.from(lastExpense!);
-      if (forCache && cacheLastExpense['date'] is Timestamp) {
-        cacheLastExpense['date'] = (cacheLastExpense['date'] as Timestamp).toDate().millisecondsSinceEpoch;
-      } else if (!forCache && cacheLastExpense['date'] is int) {
-        // Esto no debería ocurrir si el flujo es Firestore -> Modelo -> Cache -> Modelo
-        // Pero por seguridad, si estamos convirtiendo a Firestore y la fecha es int, la convertimos a Timestamp
-         cacheLastExpense['date'] = Timestamp.fromMillisecondsSinceEpoch(cacheLastExpense['date'] as int);
+      // Aseguramos que lastExpense no sea null antes de usarlo con Map.from
+      processedLastExpense = Map<String, dynamic>.from(lastExpense!);
+      final dateValue = processedLastExpense['date'];
+
+      if (forCache) {
+        if (dateValue is Timestamp) {
+          processedLastExpense['date'] = dateValue.toDate().millisecondsSinceEpoch;
+        } else if (dateValue is DateTime) { // Added to handle DateTime for cache
+          processedLastExpense['date'] = dateValue.millisecondsSinceEpoch;
+        }
+        // Si ya es int, no se hace nada para la caché
+      } else { // for Firestore
+        if (dateValue is int) {
+          processedLastExpense['date'] = Timestamp.fromMillisecondsSinceEpoch(dateValue);
+        } else if (dateValue is DateTime) { // Added to handle DateTime for Firestore
+          processedLastExpense['date'] = Timestamp.fromDate(dateValue);
+        }
+        // Si ya es Timestamp, no se hace nada para Firestore
       }
-       // Si lastExpense['date'] ya es un int (de la caché) y forCache es true, no se hace nada.
-       // Si lastExpense['date'] ya es Timestamp y forCache es false, no se hace nada.
     }
 
     return {
@@ -103,7 +127,7 @@ class GroupModel {
       'participantBalances': participantBalances,
       'totalExpenses': totalExpenses,
       'expensesCount': expensesCount,
-      'lastExpense': forCache ? cacheLastExpense : lastExpense, // Usar el lastExpense procesado para caché
+      'lastExpense': processedLastExpense, // Usar el lastExpense procesado
     };
   }
 }
