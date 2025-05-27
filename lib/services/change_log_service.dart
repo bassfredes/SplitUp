@@ -5,7 +5,7 @@ class ChangeLogService {
   final FirebaseFirestore _db;
 
   // Constructor que acepta una instancia de FirebaseFirestore
-  ChangeLogService(this._db);
+  ChangeLogService([FirebaseFirestore? db]) : _db = db ?? FirebaseFirestore.instance;
 
   // Registrar un cambio
   Future<void> logChange(ChangeLogModel log) async {
