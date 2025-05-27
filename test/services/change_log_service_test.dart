@@ -11,7 +11,7 @@ void main() {
   setUp(() {
     mockFirestore = FakeFirebaseFirestore(); // Initialize FakeFirebaseFirestore
     
-    // Inicializar ChangeLogService con el mock de Firestore
+    // Initialize ChangeLogService with the mock Firestore
     changeLogService = ChangeLogService(mockFirestore);
   });
 
