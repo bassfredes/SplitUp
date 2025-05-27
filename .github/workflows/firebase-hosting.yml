@@ -25,6 +25,27 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Run Flutter Tests
+        run: flutter test --coverage
+
+      - name: Check code coverage threshold
+        uses: VeryGoodOpenSource/very_good_coverage@v3
+        with:
+          path: coverage/lcov.info
+          min_coverage: 80
+
+      - name: Install lcov
+        run: sudo apt-get update && sudo apt-get install -y lcov
+
+      - name: Generate HTML coverage report
+        run: genhtml coverage/lcov.info -o coverage/html
+
+      - name: Upload HTML coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/html
+
       - name: Write Firebase service account key to file
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPLITUP_5972D }}' > $HOME/firebase-key.json
 

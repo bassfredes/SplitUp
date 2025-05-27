@@ -2,7 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/change_log_model.dart';
 
 class ChangeLogService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db;
+
+  // Constructor accepting a FirebaseFirestore instance
+  ChangeLogService([FirebaseFirestore? db]) : _db = db ?? FirebaseFirestore.instance;
 
   // Registrar un cambio
   Future<void> logChange(ChangeLogModel log) async {
