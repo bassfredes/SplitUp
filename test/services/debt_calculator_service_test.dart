@@ -392,5 +392,3 @@ extension DoubleIsCloseTo on double {
     return (this - other).abs() < tolerance;
   }
 }
-
-```
