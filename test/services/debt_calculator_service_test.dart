@@ -334,7 +334,6 @@ void main() {
 
         // Scenario 4: Complex case with threshold considerations
         // userA owes 10.015 (debtor), userB is owed 10.005 (creditor too small), userC is owed 0.015 (creditor)
-        balances = {'userA': -10.015, 'userB': 10.005, 'userC': 0.010}; 
         // Expected: userA pays userC 0.01. userB is ignored as creditor. userA still owes 10.005 (debtor).
         // The simplifyDebts algorithm might have userA pay userB first if userB is larger and > 0.01
         // Let's make userB large:
