@@ -15,12 +15,13 @@ class DashboardBalanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      elevation: 0,
-      color: Colors.white,
+      elevation: 0, // Eliminamos la elevación de la Card interna
+      color: Colors.transparent, // Hacemos la Card interna transparente
+      margin: EdgeInsets.zero, // Eliminamos el margen de la Card interna
       child: Padding(
         padding: EdgeInsets.symmetric(
-          vertical: isMobile ? 18 : 28,
-          horizontal: isMobile ? 8 : 28,
+          vertical: 0, // Se ajustará en los layouts específicos
+          horizontal: 0, // Se ajustará en los layouts específicos
         ),
         child: isMobile
             ? _buildMobileLayout(context)
@@ -33,9 +34,23 @@ class DashboardBalanceCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
-        _buildBalancesDisplay(context),
-        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.only(left: 0, bottom: 8), // Ajuste de padding
+          child: Row(
+            children: [
+              Icon(Icons.account_balance_wallet_outlined, color: Colors.black54, size: 20), // Tamaño ajustado
+              const SizedBox(width: 8),
+              const Text(
+                'Summary of your balances',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18), // Tamaño ajustado
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 0, bottom: 16), // Ajuste de padding
+          child: _buildBalancesDisplay(context),
+        ),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
@@ -58,17 +73,33 @@ class DashboardBalanceCard extends StatelessWidget {
   Widget _buildDesktopLayout(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Summary of your balances', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
-              _buildBalancesDisplay(context),
+              Padding(
+                padding: const EdgeInsets.only(left: 0, bottom: 8), // Ajuste de padding, igual a _buildGroupsSection
+                child: Row(
+                  children: [
+                    Icon(Icons.account_balance_wallet_outlined, color: Colors.black54, size: 22), // Tamaño ajustado
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Summary of your balances',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20), // Tamaño ajustado
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 0), // Ajuste de padding
+                child: _buildBalancesDisplay(context),
+              ),
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 20), // Espacio aumentado
         Flexible(
           fit: FlexFit.loose,
           child: ElevatedButton(
@@ -94,31 +125,51 @@ class DashboardBalanceCard extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
-            padding: EdgeInsets.only(top: 8.0),
-            child: CircularProgressIndicator(),
+            padding: EdgeInsets.symmetric(vertical: 20.0), // Adjusted padding for loader
+            child: Center(
+              child: SizedBox(
+                height: 30, // Consistent height for loader
+                width: 30,  // Consistent width for loader
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20.0),
+            child: Text('Error loading balances.', style: TextStyle(fontSize: 16, color: Colors.red)),
           );
         }
         final balances = snapshot.data ?? {};
         if (balances.isEmpty) {
           return const Padding(
-            padding: EdgeInsets.only(top: 8.0),
-            child: Text('No balances', style: TextStyle(fontSize: 22, color: Colors.grey)),
+            padding: EdgeInsets.symmetric(vertical: 20.0), // Adjusted padding
+            child: Text('No balances yet.', style: TextStyle(fontSize: 18, color: Colors.grey)), // Adjusted font size
           );
         }
-        // TODO: Consider how to display multiple currencies if that's a possibility.
-        // For now, just displaying the first one.
-        final value = balances.values.first;
-        final currency = balances.keys.first;
-        final color = value < 0 ? const Color(0xFFE14B4B) : const Color(0xFF1BC47D);
+
         return Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            formatCurrency(value, currency),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 36,
-              color: color,
-            ),
+          padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: balances.entries.map((entry) {
+              final currency = entry.key;
+              final value = entry.value;
+              final color = value < 0 ? const Color(0xFFD32F2F) : const Color(0xFF388E3C);
+              
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0), // Add some vertical spacing between currency balances
+                child: Text(
+                  formatCurrency(value, currency), // formatCurrency should handle symbol and formatting
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 22 : 26, // Adjusted responsive font size for multiple lines
+                    color: color,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         );
       },

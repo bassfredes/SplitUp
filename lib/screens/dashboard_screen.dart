@@ -135,7 +135,7 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   Widget _buildDashboardScreenContent(String? groupId, UserModel user, GroupProvider groupProvider, bool isMobile) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA),
+      backgroundColor: Color.fromARGB(255, 225, 247, 244), // Fondo general de la pantalla
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: kPrimaryColor,
         foregroundColor: Colors.white,
@@ -166,7 +166,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                 margin: EdgeInsets.only(top: isMobile ? 8 : 20, bottom: isMobile ? 8 : 20, left: isMobile ? 10 : 0, right: isMobile ? 10 : 0),
                 padding: EdgeInsets.all(isMobile ? 8 : 18),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Colors.white, // Fondo blanco para el contenedor principal del contenido
                   borderRadius: BorderRadius.circular(isMobile ? 12 : 24),
                   boxShadow: [
                     BoxShadow(
@@ -179,89 +179,82 @@ class _DashboardContentState extends State<_DashboardContent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(top: isMobile ? 18 : 28, left: isMobile ? 8 : 28, right: isMobile ? 8 : 28),
-                          child: Row(
+                    // Sección de Información de Usuario y Balance General
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: isMobile ? 18 : 28,
+                        left: isMobile ? 8 : 28,
+                        right: isMobile ? 8 : 28,
+                        bottom: isMobile ? 12 : 20, // Espacio antes de la siguiente sección
+                      ),
+                      child: Column(
+                        children: [
+                          Row( // Encabezado de Usuario
                             children: [
                               CircleAvatar(
-                                radius: 28,
+                                radius: isMobile ? 24 : 28, // Ajuste de tamaño para móvil
                                 backgroundColor: Colors.grey[300],
                                 backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty ? NetworkImage(user.photoUrl!) : null,
                                 child: (user.photoUrl == null || user.photoUrl!.isEmpty)
-                                    ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 24, color: Colors.white))
+                                    ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: TextStyle(fontSize: isMobile ? 20 : 24, color: Colors.white))
                                     : null,
                               ),
                               const SizedBox(width: 18),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                                  Text(user.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 18 : 22)),
                                   if (user.email.isNotEmpty)
-                                    Text(user.email, style: const TextStyle(color: Colors.grey, fontSize: 15)),
+                                    Text(user.email, style: TextStyle(color: Colors.grey, fontSize: isMobile ? 13 : 15)),
                                 ],
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 18),
-                        DashboardBalanceCard(
-                          balancesFuture: _balancesFuture,
-                          isMobile: isMobile,
-                        ),
-                        const SizedBox(height: 24),
-                        Card(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                          elevation: 0,
-                          color: Colors.white,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: 24,
-                              horizontal: isMobile ? 12 : 24,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Your groups', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
-                                const SizedBox(height: 16),
-                                Consumer<GroupProvider>(
-                                  builder: (context, groupProviderConsumer, _) {
-                                    if (groupProviderConsumer.loading) {
-                                      return const Center(child: CircularProgressIndicator());
-                                    }
-                                    if (groupProviderConsumer.groups.isEmpty) {
-                                      return const Text('No groups yet.');
-                                    }
-                                    return Column(
-                                      children: groupProviderConsumer.groups.map((group) {
-                                        return GroupCard(key: ValueKey(group.id), group: group, currentUserId: user.id);
-                                      }).toList(),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
+                          SizedBox(height: isMobile ? 16 : 24), // Espacio aumentado
+                          // DashboardBalanceCard ahora incluye el título "Summary of your balances"
+                          DashboardBalanceCard(
+                            balancesFuture: _balancesFuture,
+                            isMobile: isMobile,
+                            // Podríamos pasar un callback para "Settle up" aquí si fuera necesario
+                            // onSettleUp: () { /* Lógica para Settle Up */ },
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    if (groupId != null)
+                    
+                    // Divisor visual sutil
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 28, vertical: isMobile ? 8 : 16),
+                      child: Divider(color: Colors.grey[300], height: 1),
+                    ),
+
+                    // Sección de Grupos y Gastos por Categoría
+                    if (isMobile) ...[
+                      // VISTA MOBILE: Columnas
+                      _buildGroupsSection(user, groupProvider, isMobile),
+                      if (groupId != null) _buildCategorySpendingSection(groupId, isMobile),
+                    ] else ...[
+                      // VISTA DESKTOP: Filas
                       Padding(
-                        padding: const EdgeInsets.only(top: 24.0),
-                        child: Card(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          elevation: 0,
-                          color: Colors.white,
-                          child: Padding(
-                            padding: EdgeInsets.all(isMobile ? 8 : 18),
-                            child: CategorySpendingChart(groupId: groupId),
-                          ),
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10), // Padding para la sección de Row
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 1, // Los grupos toman MENOS espacio
+                              child: _buildGroupsSection(user, groupProvider, isMobile),
+                            ),
+                            const SizedBox(width: 24), // Espacio entre las dos columnas
+                            Expanded(
+                              flex: 2, // El gráfico de categorías toma MÁS espacio
+                              child: groupId != null 
+                                  ? _buildCategorySpendingSection(groupId, isMobile)
+                                  : const SizedBox(), // Si no hay groupId, no mostrar nada
+                            ),
+                          ],
                         ),
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -273,13 +266,91 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
+  // Nuevo widget helper para la sección de grupos
+  Widget _buildGroupsSection(UserModel user, GroupProvider groupProvider, bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(
+            bottom: 16,
+            left: isMobile ? 0 : 0,
+            top: isMobile ? 20 : 10,
+            right: isMobile ? 0 : 0,
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.group_outlined, color: Colors.black54, size: isMobile ? 20 : 22), // Ajustado
+              const SizedBox(width: 8), // Ajustado
+              Text(
+                'Your Groups',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: isMobile ? 18 : 20, // Ajustado
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Consumer<GroupProvider>(
+          builder: (context, groupProviderConsumer, _) {
+            if (groupProviderConsumer.loading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (groupProviderConsumer.groups.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(child: Text('No groups yet. Create one to get started!', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey))),
+              );
+            }
+            return ListView.builder( // Usar ListView.builder para mejor rendimiento si hay muchos grupos
+              shrinkWrap: true, // Necesario dentro de otra SingleChildScrollView/Column
+              physics: const NeverScrollableScrollPhysics(), // Deshabilitar scroll propio
+              itemCount: groupProviderConsumer.groups.length,
+              itemBuilder: (context, index) {
+                final group = groupProviderConsumer.groups[index];
+                return GroupCard(key: ValueKey(group.id), group: group, currentUserId: user.id);
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // Nuevo widget helper para la sección de gastos por categoría
+  Widget _buildCategorySpendingSection(String groupId, bool isMobile) {
+    return Card( // Envolver CategorySpendingChart directamente con Card
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      elevation: 3,
+      shadowColor: Colors.black.withOpacity(0.08),
+      color: Colors.white,
+      margin: EdgeInsets.only(
+        top: isMobile ? 16 : 0, // Ajustado para desktop
+        bottom: isMobile ? 16 : 10,
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          isMobile ? 12 : 18, // left
+          isMobile ? 12 : 10,  // top
+          isMobile ? 12 : 18, // right
+          isMobile ? 12 : 18  // bottom
+        ),
+        child: CategorySpendingChart(groupId: groupId), // Pasar el groupId
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user!;
     final groupProviderInstance = Provider.of<GroupProvider>(context, listen: false);
     final firstGroupId = groupProviderInstance.groups.isNotEmpty ? groupProviderInstance.groups.first.id : null;
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = MediaQuery.of(context).size.width < 1000; // Changed breakpoint to 1000px
 
     return _buildDashboardScreenContent(firstGroupId, user, groupProviderInstance, isMobile);
   }

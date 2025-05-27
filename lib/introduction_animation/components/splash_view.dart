@@ -40,13 +40,11 @@ class _SplashViewState extends State<SplashView> {
                 // Title
                 Padding(
                   padding: EdgeInsets.only(top: 16.0, bottom: 8.0),
-                  child: Text(
-                    "SplitUp",
-                    style: TextStyle(
-                      fontSize: 32.0,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Roboto',
-                      color: Colors.black,
+                  child: SizedBox(
+                    height: 50,
+                    child: Image.asset(
+                      'assets/logo/logo-header.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),

@@ -28,14 +28,22 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
     final width = MediaQuery.of(context).size.width;
     final isMobile = width < 500;
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha((0.07 * 255).round()), // Sombra similar al dashboard
+            blurRadius: 8, // Un blurRadius fijo o ajustado según necesidad
+            offset: const Offset(0, 4), // Sombra principalmente inferior
+          ),
+        ],
+      ),
       child: SafeArea(
         child: Center(
           child: Container(
-            width: width * 0.95,
             constraints: const BoxConstraints(maxWidth: 1280),
-            height: isMobile ? 64 : kToolbarHeight + 50,
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 16, vertical: isMobile ? 8 : 25),
+            height: isMobile ? 64 : kToolbarHeight + 20, // Ajuste de altura para compensar la sombra visualmente
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24, vertical: isMobile ? 8 : 10), // Ajuste de padding
             child: Row(
               children: [
                 MouseRegion(
@@ -179,5 +187,5 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 50);
+  Size get preferredSize => Size.fromHeight( (MediaQueryData.fromView(WidgetsBinding.instance.window).size.width < 500) ? 64 : kToolbarHeight + 30);
 }

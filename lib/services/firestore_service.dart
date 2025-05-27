@@ -291,6 +291,25 @@ class FirestoreService {
         .toList();
   }
 
+  // Nuevo método para obtener un DocumentSnapshot por su path
+  Future<DocumentSnapshot?> getDocumentSnapshot(String documentPath) async {
+    try {
+      final doc = await _db.doc(documentPath).get();
+      // Asumiendo que el parent.id es el nombre de la colección para el monitor
+      // Puede que necesites ajustar esto si la estructura de path es más compleja
+      // o si tienes una forma estándar de determinar la colección desde el path.
+      if (doc.reference.parent.parent != null) { // e.g. groups/{groupId}/expenses/{expenseId}
+         _monitor.logRead(doc.reference.parent.id); 
+      } else { // e.g. users/{userId}
+         _monitor.logRead(doc.reference.parent.path); // o alguna otra lógica
+      }
+      return doc.exists ? doc : null;
+    } catch (e) {
+      print("Error al obtener DocumentSnapshot para $documentPath: $e");
+      return null;
+    }
+  }
+
   // Método para obtener el total de gastos (para saber cuántas páginas hay)
   Future<int> getExpensesCount(String groupId) async {
     final snapshot = await _db

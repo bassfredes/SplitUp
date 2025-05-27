@@ -45,7 +45,9 @@ class ExpenseModel {
       amount: (map['amount'] ?? 0).toDouble(),
       date: map['date'] is Timestamp
           ? (map['date'] as Timestamp).toDate()
-          : DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
+          : map['date'] is int // Añadido para caché
+              ? DateTime.fromMillisecondsSinceEpoch(map['date'] as int)
+              : DateTime.now(), // Fallback, o manejar error
       participantIds: List<String>.from(map['participantIds'] ?? []),
       payers: (map['payers'] as List<dynamic>? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))
@@ -66,12 +68,13 @@ class ExpenseModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toMap({bool forCache = false}) { // Añadido parámetro opcional
     final map = <String, dynamic>{
       'groupId': groupId,
       'description': description,
       'amount': amount,
-      'date': Timestamp.fromDate(date),
+      // Modificado para caché: usa milisegundos. Para Firestore: usa Timestamp.
+      'date': forCache ? date.millisecondsSinceEpoch : Timestamp.fromDate(date),
       'participantIds': participantIds,
       'payers': payers,
       'createdBy': createdBy,

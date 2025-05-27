@@ -17,12 +17,23 @@ class CategorySpendingChart extends StatefulWidget {
   State<CategorySpendingChart> createState() => _CategorySpendingChartState();
 }
 
-class _CategorySpendingChartState extends State<CategorySpendingChart> {
+// Añadir SingleTickerProviderStateMixin para el AnimationController
+class _CategorySpendingChartState extends State<CategorySpendingChart> with TickerProviderStateMixin {
   String _selectedPeriod = 'this_month';
   DateTimeRange? _customDateRange;
   bool _initialRenderComplete = false; // Nueva bandera
   bool _isDropdownHovered = false; // Variable para el estado hover del Dropdown
   String? _selectedGroupIdInChart; // Nuevo: para el grupo seleccionado en el gráfico
+
+  // Para animación de carga
+  AnimationController? _loadAnimationController;
+  Animation<double>? _fadeAnimation;
+  Animation<Offset>? _slideAnimation;
+  bool _hasLoadAnimationPlayed = false;
+
+  // Para animación de hover en secciones del gráfico
+  int _hoveredSectionIndex = -1;
+  AnimationController? _hoverAnimationController;
 
   final Map<String, String> _periods = {
     'this_month': 'This month',
@@ -34,6 +45,34 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
   void initState() {
     super.initState();
     _selectedGroupIdInChart = widget.groupId;
+
+    _loadAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 650), // Duración de la animación de carga
+      vsync: this,
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _loadAnimationController!,
+      curve: Curves.easeIn,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3), // Empezar desde un poco abajo
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _loadAnimationController!,
+      curve: Curves.easeOutCubic, // Curva suave para el slide
+    ));
+
+    _hoverAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 200), // Duración de la animación de hover
+      vsync: this,
+    )..addListener(() { // Listener movido aquí
+      if (mounted) {
+        setState(() {}); // Reconstruir para aplicar el valor de animación
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         // Cargar gastos para el grupo inicial seleccionado si existe
@@ -42,9 +81,17 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
         }
         setState(() {
           _initialRenderComplete = true;
+          // La animación de carga se disparará en _buildChart cuando haya datos
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _loadAnimationController?.dispose();
+    _hoverAnimationController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -123,22 +170,33 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
   }
 
   Widget _buildHeader() {
-    final groupProvider = Provider.of<GroupProvider>(context, listen: false); // Para acceder a los grupos
+    final groupProvider = Provider.of<GroupProvider>(context, listen: false);
     final availableGroups = groupProvider.groups;
+    final isMobile = MediaQuery.of(context).size.width < 1000; // Para consistencia de estilo
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start, // Cambiado de .center a .start
           children: [
-            const Text(
-              'Category Spending',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            // Título con icono
+            Row(
+              children: [
+                Icon(Icons.pie_chart_outline_rounded, color: Colors.black54, size: isMobile ? 20 : 22),
+                const SizedBox(width: 8),
+                Text(
+                  'Category Spending',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: isMobile ? 18 : 20,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
             ),
+            // Selector de período
             MouseRegion(
               onEnter: (_) => setState(() => _isDropdownHovered = true),
               onExit: (_) => setState(() => _isDropdownHovered = false),
@@ -216,43 +274,46 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
         ),
         if (availableGroups.isNotEmpty && availableGroups.length > 1) ...[ // Mostrar solo si hay más de un grupo
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("Selected Group:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade300, width: 1.0),
-                  borderRadius: BorderRadius.circular(8.0),
+          Padding( // Envolver el Row del selector de grupo con Padding
+            padding: const EdgeInsets.only(right: 0), // Asegurar que no haya padding a la derecha
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Selected Group:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: Colors.grey.shade300, width: 1.0),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: DropdownButton<String>(
+                    value: _selectedGroupIdInChart,
+                    items: availableGroups.map((group) {
+                      return DropdownMenuItem<String>(
+                        value: group.id,
+                        child: Text(group.name, style: const TextStyle(fontSize: 14)),
+                      );
+                    }).toList(),
+                    onChanged: (newGroupId) {
+                      if (newGroupId != null && newGroupId != _selectedGroupIdInChart) {
+                        Provider.of<ExpenseProvider>(context, listen: false).loadExpenses(newGroupId);
+                        setState(() {
+                          _selectedGroupIdInChart = newGroupId;
+                          _selectedPeriod = 'this_month'; // Resetear período
+                          _customDateRange = null;      // Resetear rango custom
+                        });
+                      }
+                    },
+                    underline: const SizedBox.shrink(),
+                    isDense: true,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                    dropdownColor: Colors.white,
+                    iconEnabledColor: Colors.teal,
+                  ),
                 ),
-                child: DropdownButton<String>(
-                  value: _selectedGroupIdInChart,
-                  items: availableGroups.map((group) {
-                    return DropdownMenuItem<String>(
-                      value: group.id,
-                      child: Text(group.name, style: const TextStyle(fontSize: 14)),
-                    );
-                  }).toList(),
-                  onChanged: (newGroupId) {
-                    if (newGroupId != null && newGroupId != _selectedGroupIdInChart) {
-                      Provider.of<ExpenseProvider>(context, listen: false).loadExpenses(newGroupId);
-                      setState(() {
-                        _selectedGroupIdInChart = newGroupId;
-                        _selectedPeriod = 'this_month'; // Resetear período
-                        _customDateRange = null;      // Resetear rango custom
-                      });
-                    }
-                  },
-                  underline: const SizedBox.shrink(),
-                  isDense: true,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                  dropdownColor: Colors.white,
-                  iconEnabledColor: Colors.teal,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ],
@@ -264,6 +325,8 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
     final categoryData = _calculateCategoryData(filteredExpenses);
     
     if (categoryData.isEmpty) {
+      // Si no hay datos, resetear la bandera de animación para que se ejecute la próxima vez que haya datos.
+      _hasLoadAnimationPlayed = false; 
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24.0),
@@ -272,34 +335,72 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
       );
     }
 
+    // Disparar animación de carga si hay datos y no se ha reproducido
+    if (!_hasLoadAnimationPlayed) {
+      _loadAnimationController?.forward(from: 0.0); // Asegurar que comience desde el principio
+      _hasLoadAnimationPlayed = true;
+    }
+
     // Obtener el código de moneda de los gastos filtrados
     final String currencyCode = filteredExpenses.isNotEmpty ? filteredExpenses.first.currency : '';
 
-    return SizedBox(
-      height: 200,
-      child: PieChart( // Se elimina el Stack y el Center para quitar el total del centro
-        PieChartData(
-          sectionsSpace: 0, // Eliminamos el espacio entre secciones
-          centerSpaceRadius: 60, // Aumentar para un agujero central más grande
-          sections: _buildChartSections(categoryData),
-          pieTouchData: PieTouchData(
-            touchCallback: (FlTouchEvent event, PieTouchResponse? pieTouchResponse) {
-              // print('PieChart Touch Event: $event, Response: $pieTouchResponse'); // Log para depuración
-              if (!event.isInterestedForInteractions ||
-                  pieTouchResponse == null ||
-                  pieTouchResponse.touchedSection == null) {
-                return;
-              }
-              // Solo mostrar detalles en el evento de FlTapUpEvent
-              if (event is FlTapUpEvent) {
-                final touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-                if (touchedIndex >= 0 && touchedIndex < categoryData.length) {
-                  final category = categoryData[touchedIndex].category;
-                  // Pasar currencyCode a _showCategoryDetails
-                  _showCategoryDetails(category, filteredExpenses, currencyCode);
-                }
-              }
-            },
+    // Envolver con FadeTransition y SlideTransition
+    return FadeTransition(
+      opacity: _fadeAnimation!,
+      child: SlideTransition(
+        position: _slideAnimation!,
+        child: SizedBox(
+          height: 200,
+          child: PieChart( // Se elimina el Stack y el Center para quitar el total del centro
+            PieChartData(
+              sectionsSpace: 0, // Eliminamos el espacio entre secciones
+              centerSpaceRadius: 60, // Aumentar para un agujero central más grande
+              sections: _buildChartSections(categoryData),
+              pieTouchData: PieTouchData(
+                touchCallback: (FlTouchEvent event, PieTouchResponse? pieTouchResponse) {
+                  setState(() {
+                    if (!event.isInterestedForInteractions) {
+                      if (_hoveredSectionIndex != -1) {
+                        _hoverAnimationController?.reverse();
+                        _hoveredSectionIndex = -1;
+                      }
+                      return;
+                    }
+
+                    if (event is FlPointerHoverEvent || event is FlTapDownEvent) {
+                      if (pieTouchResponse != null && pieTouchResponse.touchedSection != null) {
+                        if (_hoveredSectionIndex != pieTouchResponse.touchedSection!.touchedSectionIndex) {
+                          _hoveredSectionIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                          _hoverAnimationController?.forward(from: 0.0);
+                        } else if (!_hoverAnimationController!.isAnimating && _hoverAnimationController!.status == AnimationStatus.dismissed) {
+                          // Si ya está seleccionada y la animación está en dismissed, iniciarla.
+                          _hoverAnimationController?.forward(from: 0.0);
+                        }
+                      } else {
+                        if (_hoveredSectionIndex != -1) {
+                          _hoverAnimationController?.reverse();
+                          _hoveredSectionIndex = -1;
+                        }
+                      }
+                    } else if (event is FlPointerExitEvent) {
+                      if (_hoveredSectionIndex != -1) {
+                        _hoverAnimationController?.reverse();
+                        _hoveredSectionIndex = -1;
+                      }
+                    }
+                  });
+
+                  // Lógica para el tap (mostrar detalles)
+                  if (event is FlTapUpEvent) {
+                    final touchedIndex = pieTouchResponse?.touchedSection?.touchedSectionIndex;
+                    if (touchedIndex != null && touchedIndex >= 0 && touchedIndex < categoryData.length) {
+                      final categoryKey = categoryData[touchedIndex].category;
+                      _showCategoryDetails(categoryKey, filteredExpenses, currencyCode);
+                    }
+                  }
+                },
+              ),
+            ),
           ),
         ),
       ),
@@ -322,6 +423,8 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
     List<Widget> legendItems = categoryData.map((data) {
       final categoryTotalAmount = categoryData.fold<double>(0, (sum, item) => sum + item.amount); // Suma de los montos de las categorías para el porcentaje
       final percentage = categoryTotalAmount > 0 ? (data.amount / categoryTotalAmount * 100).round() : 0;
+      final categoryDisplayLabel = _getCategoryDisplayLabel(data.category); // Obtener el label
+
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 2.0), // Reducir padding vertical
         child: ListTile(
@@ -330,7 +433,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
             width: 18, // Ligeramente más pequeño
             height: 18, // Ligeramente más pequeño
             decoration: BoxDecoration(
-              color: getCategoryColor(data.category),
+              color: getCategoryColor(data.category), // Usar la key para el color
               shape: BoxShape.circle,
             ),
           ),
@@ -338,7 +441,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
             children: [
               Expanded(
                 child: Text(
-                  data.category.isNotEmpty ? data.category : 'Uncategorized',
+                  categoryDisplayLabel, // Usar el label para mostrar
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
@@ -353,7 +456,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
             formatCurrency(data.amount, currencyCode), 
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
-          // Pasar currencyCode a _showCategoryDetails
+          // Pasar la key de la categoría a _showCategoryDetails
           onTap: () => _showCategoryDetails(data.category, filteredExpenses, currencyCode),
         ),
       );
@@ -391,26 +494,48 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
 
   List<PieChartSectionData> _buildChartSections(List<CategoryData> categoryData) {
     final totalAmount = categoryData.fold<double>(0, (sum, data) => sum + data.amount);
-    // int? touchedIndex = -1; // Variable para manejar el índice tocado si se implementa lógica de resaltado
 
     return List.generate(categoryData.length, (i) {
       final data = categoryData[i];
-      // final isTouched = i == touchedIndex; // Lógica para determinar si la sección está tocada
-      const fontSize = 14.0; // Tamaño de fuente constante por ahora
-      const radius = 50.0;   // Radio constante por ahora
+      final bool currentlyTouched = i == _hoveredSectionIndex;
+      
+      // Usar el valor de _hoverAnimation para interpolar radio y fontSize
+      final double animationFactor = (_hoverAnimationController?.value ?? 0.0);
+      final double radius = 55.0 + (10.0 * (currentlyTouched ? animationFactor : 0.0));
+      final double fontSize = 14.0 + (3.0 * (currentlyTouched ? animationFactor : 0.0));
+
+      // Propiedades que cambian con la animación de hover
+      // Se reduce el umbral de animationFactor de 0.5 a 0.2 para que el efecto sea visible antes
+      final Color titleColor = currentlyTouched && animationFactor > 0.2 ? Colors.white : Colors.white.withOpacity(0.9);
+      final List<BoxShadow>? shadows = currentlyTouched && animationFactor > 0.2
+          ? [
+              const BoxShadow(
+                  color: Colors.black38,
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                  offset: Offset(1, 1)), // Sombra direccional sutil
+              const BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 8,
+                  spreadRadius: 0,
+                  offset: Offset(0, 0)) // Sombra ambiental más suave
+            ]
+          : null;
+
       final percentage = totalAmount > 0 ? (data.amount / totalAmount * 100).round() : 0;
 
       return PieChartSectionData(
         color: getCategoryColor(data.category),
         value: data.amount,
         title: '$percentage%',
-        radius: radius,
-        titleStyle: const TextStyle(
-          fontSize: fontSize,
+        radius: radius, // Usar radio animado
+        titleStyle: TextStyle(
+          fontSize: fontSize, // Usar tamaño de fuente animado
           fontWeight: FontWeight.bold,
-          color: Colors.white,
-          // Eliminamos las sombras del texto
+          color: titleColor, // Usar color de título modificado
+          shadows: shadows,  // Usar sombras modificadas
         ),
+        borderSide: BorderSide.none, // Asegurar que no haya borde
       );
     });
   }
@@ -451,17 +576,19 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
   }
   
   // Modificar la firma para aceptar currencyCode
-  void _showCategoryDetails(String category, List<ExpenseModel> expenses, String currencyCode) {
-    if (!mounted || !_initialRenderComplete) return; // Comprobar la bandera y si está montado
+  void _showCategoryDetails(String categoryKey, List<ExpenseModel> expenses, String currencyCode) { // categoryKey en lugar de category
+    if (!mounted || !_initialRenderComplete) return;
+
+    final categoryDisplayLabel = _getCategoryDisplayLabel(categoryKey); // Obtener el label
 
     // Ordenar gastos por fecha, más recientes primero
     final categoryExpenses = expenses
-        .where((e) => (e.category ?? 'Uncategorized') == category)
+        .where((e) => (e.category ?? 'Uncategorized') == categoryKey) // Filtrar por key
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
     
     final totalAmount = categoryExpenses.fold<double>(0, (sum, e) => sum + e.amount);
-    final categoryColor = getCategoryColor(category);
+    final categoryColor = getCategoryColor(categoryKey); // Usar key para el color
     
     // Calcular el porcentaje que representa esta categoría del total
     final allExpensesTotal = expenses.fold<double>(0, (sum, e) => sum + e.amount);
@@ -532,14 +659,15 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
                                   width: 24,
                                   height: 24,
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: Colors.white, // El círculo interior es blanco
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
+                                    // El borde puede ser del color de la categoría si se desea, o simplemente blanco
+                                    border: Border.all(color: categoryColor, width: 2), 
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
-                                  category.isNotEmpty ? category : 'Uncategorized',
+                                  categoryDisplayLabel, // Usar el label para mostrar
                                   style: const TextStyle(
                                     fontSize: 22, 
                                     fontWeight: FontWeight.bold,
@@ -699,6 +827,36 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
       },
     );
   }
+
+  // Helper para obtener el label de la categoría
+  String _getCategoryDisplayLabel(String categoryKey) {
+    // Asumiendo que tienes un mapa o una lógica para convertir keys a labels
+    // Este es un ejemplo, deberás adaptarlo a tu estructura de datos de categorías
+    const categoryLabels = {
+      'food': 'Food',
+      'transport': 'Transport',
+      'housing': 'Housing',
+      'utilities': 'Utilities',
+      'entertainment': 'Entertainment',
+      'health': 'Health',
+      'education': 'Education',
+      'apparel': 'Apparel',
+      'personal_care': 'Personal Care',
+      'gifts_donations': 'Gifts & Donations',
+      'travel': 'Travel',
+      'debt_payments': 'Debt Payments',
+      'savings_investments': 'Savings & Investments',
+      'pets': 'Pets',
+      'office_supplies': 'Office Supplies',
+      'subscriptions': 'Subscriptions',
+      'taxes': 'Taxes',
+      'insurance': 'Insurance',
+      'other': 'Other',
+      'uncategorized': 'Uncategorized',
+      'sin_categoría': 'Uncategorized', // Asegúrate de manejar también esta key si se usa
+    };
+    return categoryLabels[categoryKey.toLowerCase()] ?? categoryKey; // Devuelve la key si no se encuentra el label
+  }
 }
 
 class CategoryData {
@@ -706,4 +864,266 @@ class CategoryData {
   final double amount;
   
   CategoryData(this.category, this.amount);
+}
+
+// Define CategoryExpenseList StatefulWidget BEFORE _CategorySpendingChartState
+class CategoryExpenseList extends StatefulWidget {
+  final ScrollController scrollController;
+  final String selectedGroupId;
+  final String categoryKey;
+  final String currencyCode;
+  final Color categoryColor;
+  final String categoryDisplayLabel;
+
+  const CategoryExpenseList({
+    super.key,
+    required this.scrollController,
+    required this.selectedGroupId,
+    required this.categoryKey,
+    required this.currencyCode,
+    required this.categoryColor,
+    required this.categoryDisplayLabel,
+  });
+
+  @override
+  State<CategoryExpenseList> createState() => _CategoryExpenseListState();
+}
+
+class _CategoryExpenseListState extends State<CategoryExpenseList> {
+  late ExpenseProvider _expenseProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    // It's important to get the provider instance without listening here,
+    // as the Consumer widget will handle rebuilding on changes.
+    _expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
+    widget.scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (widget.scrollController.position.pixels == widget.scrollController.position.maxScrollExtent &&
+        _expenseProvider.hasMoreExpenses &&
+        !_expenseProvider.loadingMoreExpenses) {
+      _expenseProvider.loadMoreExpenses(widget.selectedGroupId);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_onScroll);
+    // Do not dispose the scrollController itself as it's managed by DraggableScrollableSheet
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ExpenseProvider>(
+      builder: (context, expenseProvider, child) {
+        final allGroupExpenses = expenseProvider.expenses;
+        final categoryExpenses = allGroupExpenses
+            .where((e) => (e.category ?? 'Uncategorized') == widget.categoryKey)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date)); // Sort by date, most recent first
+
+        final totalAmountForCategory = categoryExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+        
+        final allExpensesTotalInGroup = allGroupExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+        final categoryPercentage = allExpensesTotalInGroup > 0 
+            ? ((totalAmountForCategory / allExpensesTotalInGroup) * 100).round() 
+            : 0;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha((0.1 * 255).round()),
+                blurRadius: 10,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            // mainAxisSize: MainAxisSize.min, // This might not be needed if Column is child of Expanded
+            children: [
+              // Header Section
+              Container(
+                decoration: BoxDecoration(
+                  color: widget.categoryColor.withAlpha((0.9 * 255).round()),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        height: 5,
+                        width: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha((0.5 * 255).round()),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: widget.categoryColor, width: 2), 
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              widget.categoryDisplayLabel,
+                              style: const TextStyle(
+                                fontSize: 22, 
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Total gasto',
+                              style: TextStyle(fontSize: 14, color: Colors.white70),
+                            ),
+                            Text(
+                              formatCurrency(totalAmountForCategory, widget.currencyCode),
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha((0.2 * 255).round()),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '$categoryPercentage% del total',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.receipt_long, size: 20, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Gastos (${categoryExpenses.length})', // Updated to show current count
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 24),
+              
+              Expanded(
+                child: categoryExpenses.isEmpty && !expenseProvider.loadingMoreExpenses
+                  ? const Center(child: Text('No hay gastos registrados para esta categoría.'))
+                  : ListView.builder(
+                    controller: widget.scrollController,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: categoryExpenses.length + (expenseProvider.loadingMoreExpenses ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == categoryExpenses.length) { // This is the loading indicator item
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0), // Increased padding
+                            child: expenseProvider.hasMoreExpenses 
+                                   ? const CircularProgressIndicator()
+                                   : const Text("No más gastos por cargar."), // Message when no more expenses
+                          ),
+                        );
+                      }
+                      final expense = categoryExpenses[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        elevation: 0.5,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.grey.shade200),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      expense.description,
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    formatCurrency(expense.amount, widget.currencyCode), // Use widget.currencyCode
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: widget.categoryColor, // Use widget.categoryColor
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [ // Removed MainAxisAlignment.spaceBetween
+                                  Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    DateFormat('dd MMM, yyyy').format(expense.date),
+                                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

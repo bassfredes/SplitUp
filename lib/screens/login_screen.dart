@@ -23,6 +23,7 @@ class LoginScreen extends StatelessWidget {
       }
     }
     return Scaffold(
+      backgroundColor: Color.fromARGB(255, 225, 247, 244),
       body: Center(
         child: SingleChildScrollView( 
           child: Container(

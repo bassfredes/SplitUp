@@ -38,7 +38,7 @@ class _IntroductionAnimationScreenState
   Widget build(BuildContext context) {
     bool _dragHandled = false;
     return Scaffold(
-      backgroundColor: Color(0xffF7EBE1),
+      backgroundColor: Color.fromARGB(255, 225, 247, 244),
       body: GestureDetector(
         onHorizontalDragUpdate: (details) {
           final value = _animationController?.value ?? 0.0;

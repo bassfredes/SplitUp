@@ -32,29 +32,42 @@ class CacheService {
   Future<void> setData(String key, dynamic data, {Duration? expiration}) async {
     await init();
     final expiresAt = DateTime.now().add(expiration ?? defaultExpiration).millisecondsSinceEpoch;
-    final cacheData = {
-      'data': data,
+    
+    // Prepara los datos para la caché, convirtiendo Timestamps si es necesario.
+    dynamic dataToCache;
+    if (data is GroupModel) {
+      dataToCache = data.toMap(forCache: true);
+    } else if (data is List<GroupModel>) {
+      dataToCache = data.map((g) => g.toMap(forCache: true)).toList();
+    } else if (data is ExpenseModel) {
+      dataToCache = data.toMap(forCache: true);
+    } else if (data is List<ExpenseModel>) {
+      dataToCache = data.map((e) => e.toMap(forCache: true)).toList();
+    } else {
+      dataToCache = _convertTimestamps(data); // Usar función de ayuda para otros tipos
+    }
+
+    final cachePayload = {
+      'data': dataToCache,
       'expiresAt': expiresAt,
     };
     
-    // Guardar en memoria
-    _memoryCache[key] = cacheData;
+    _memoryCache[key] = cachePayload;
     
     // Guardar en SharedPreferences
-    if (data is Map || data is List) {
-      await _prefs.setString(key, jsonEncode(cacheData));
-    } else if (data is String) {
-      final Map<String, dynamic> wrappedData = {
-        'data': data,
-        'expiresAt': expiresAt,
-      };
-      await _prefs.setString(key, jsonEncode(wrappedData));
-    } else if (data is bool) {
-      await _prefs.setBool(key, data);
-    } else if (data is int) {
-      await _prefs.setInt(key, data);
-    } else if (data is double) {
-      await _prefs.setDouble(key, data);
+    // Solo se guardan Map o List (que ahora contienen datos JSON-compatibles)
+    // u otros tipos primitivos que jsonEncode maneja.
+    if (dataToCache is Map || dataToCache is List || dataToCache is String || dataToCache is bool || dataToCache is int || dataToCache is double || dataToCache == null) {
+      await _prefs.setString(key, jsonEncode(cachePayload));
+    } else {
+      // Si después de la conversión sigue sin ser un tipo básico, podría haber un problema.
+      // Por ahora, intentamos codificarlo directamente, pero esto podría fallar si _convertTimestamps no lo manejó.
+      print('Advertencia: Intentando guardar un tipo no primitivo en caché para la clave $key: ${dataToCache.runtimeType}');
+      try {
+        await _prefs.setString(key, jsonEncode(cachePayload));
+      } catch (e) {
+        print('Error al codificar datos complejos para caché ($key): $e. El tipo era ${dataToCache.runtimeType}');
+      }
     }
   }
 
@@ -97,41 +110,26 @@ class CacheService {
   }
 
   // Verifica si una clave existe en la caché y no ha expirado
-  bool hasValidData(String key) {
+  bool hasValidData(String key, {bool bypassOverride = false}) { // Renombrado el parámetro para evitar confusión
     if (!_initialized) return false;
-    
-    // Verificar memoria primero
-    if (_memoryCache.containsKey(key)) {
-      final cachedData = _memoryCache[key];
-      final expiresAt = cachedData['expiresAt'] as int;
-      
-      if (expiresAt > DateTime.now().millisecondsSinceEpoch) {
-        return true;
-      } else {
-        _memoryCache.remove(key);
-      }
-    }
-    
-    // Verificar SharedPreferences
-    final persistentData = _prefs.getString(key);
-    if (persistentData != null) {
+    dynamic cachedItem = _memoryCache[key];
+    String? persistentDataString;
+
+    if (cachedItem == null) {
+      persistentDataString = _prefs.getString(key);
+      if (persistentDataString == null) return false;
       try {
-        final decodedData = jsonDecode(persistentData);
-        final expiresAt = decodedData['expiresAt'] as int;
-        
-        if (expiresAt > DateTime.now().millisecondsSinceEpoch) {
-          // Guardar en memoria para futuros accesos
-          _memoryCache[key] = decodedData;
-          return true;
-        } else {
-          _prefs.remove(key);
-        }
+        cachedItem = jsonDecode(persistentDataString);
       } catch (e) {
-        print('Error al decodificar datos de caché: $e');
+        print('Error al decodificar datos de caché para hasValidData: $e');
+        return false;
       }
     }
     
-    return false;
+    final expiresAt = cachedItem['expiresAt'] as int?;
+    if (expiresAt == null) return false;
+
+    return bypassOverride || expiresAt > DateTime.now().millisecondsSinceEpoch; // Usar el parámetro renombrado
   }
 
   // Elimina una clave de la caché
@@ -270,5 +268,17 @@ class CacheService {
       return result.isNotEmpty ? result : null;
     }
     return null;
+  }
+
+  // Función de ayuda para convertir Timestamps anidados.
+  dynamic _convertTimestamps(dynamic item) {
+    if (item is Timestamp) {
+      return item.millisecondsSinceEpoch;
+    } else if (item is Map) {
+      return item.map((key, value) => MapEntry(key, _convertTimestamps(value)));
+    } else if (item is List) {
+      return item.map((element) => _convertTimestamps(element)).toList();
+    }
+    return item;
   }
 }

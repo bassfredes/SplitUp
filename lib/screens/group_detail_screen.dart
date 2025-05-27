@@ -3,13 +3,13 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Asegúrate que esté si se usa directamente aquí, sino en los sub-widgets
+import 'package:cloud_firestore/cloud_firestore.dart'; // Descomentado: Necesario para FieldValue y Firestore.instance
 import '../models/group_model.dart';
 import '../models/user_model.dart';
 import '../models/expense_model.dart';
 import '../providers/group_provider.dart';
 import '../providers/auth_provider.dart';
-// import '../services/debt_calculator_service.dart'; // Movido a GroupBalancesCard
+import '../providers/expense_provider.dart'; // Import ExpenseProvider
 import '../services/export_service.dart';
 import '../services/firestore_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -19,14 +19,12 @@ import '../config/constants.dart';
 import '../widgets/breadcrumb.dart';
 import '../widgets/header.dart';
 import '../screens/add_expense_screen.dart';
-// import '../utils/formatters.dart'; // Usado en sub-widgets
 import 'package:firebase_analytics/firebase_analytics.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/dialogs/invite_participant_dialog.dart';
-// import '../widgets/dialogs/edit_group_dialog.dart'; // Movido a GroupInfoCard
 import '../widgets/paginated_expense_list.dart';
-import '../widgets/group_detail/group_info_card.dart'; // Nuevo widget
-import '../widgets/group_detail/group_balances_card.dart'; // Nuevo widget
+import '../widgets/group_detail/group_info_card.dart';
+import '../widgets/group_detail/group_balances_card.dart';
 import 'dart:typed_data';
 
 class GroupDetailScreen extends StatefulWidget {
@@ -40,11 +38,26 @@ class GroupDetailScreen extends StatefulWidget {
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
   Future<List<UserModel>>? _participantsFuture;
   bool _participantsLoading = false;
+  // ScrollController para el SingleChildScrollView principal
+  final ScrollController _mainScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadParticipants();
+    // Cargar la primera página de gastos para este grupo
+    // Usar addPostFrameCallback para asegurar que el context esté disponible para Provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<ExpenseProvider>(context, listen: false).loadExpenses(widget.group.id, forceRefresh: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _mainScrollController.dispose(); // Dispose del ScrollController principal
+    super.dispose();
   }
 
   void _loadParticipants() {
@@ -68,17 +81,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     return await firestoreService.fetchUsersByIds(userIds);
   }
 
-  Stream<List<ExpenseModel>> _getGroupExpenses(String groupId) {
-    return FirebaseFirestore.instance
-        .collection('groups')
-        .doc(groupId)
-        .collection('expenses')
-        .orderBy('date', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ExpenseModel.fromMap(doc.data(), doc.id))
-            .toList());
-  }
+  // _getGroupExpenses ya no es necesario y se elimina completamente.
 
   void _showExpenseDetail(BuildContext context, ExpenseModel expense, String groupName, Map<String, UserModel> usersById) async {
     if (!context.mounted) return;
@@ -91,8 +94,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       },
     );
   }
-
-  // _buildTotalsByCurrency ha sido movido a GroupBalancesCard
 
   Future<void> _importExpensesFromCsv(List<UserModel> users) async {
     final group = widget.group;
@@ -196,17 +197,23 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<void> _saveImportedExpenses(List<ExpenseModel> expenses) async {
     final group = widget.group;
-    final batch = FirebaseFirestore.instance.batch();
-    final expensesCollectionRef = FirebaseFirestore.instance.collection('groups').doc(group.id).collection('expenses');
-    
-    for (final expense in expenses) {
-      final docRef = expensesCollectionRef.doc(); // Firestore generará un ID único
-      // Asegurarse que el createdBy se establece si es necesario, o se maneja en el modelo/servicio
-      batch.set(docRef, expense.copyWith(id: docRef.id, createdBy: Provider.of<AuthProvider>(context, listen: false).user?.id).toMap());
-    }
+    final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false); // Obtener ExpenseProvider
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     try {
-      await batch.commit();
+      // Usar el método addExpense del provider para cada gasto importado
+      // Esto asegura que la lógica de refresco de la lista (forceRefresh: true) se ejecute.
+      // Considerar un método batchAddExpenses en el provider si el rendimiento es un problema.
+      for (final expense in expenses) {
+        // Asegurarse que el createdBy se establece si es necesario
+        // El ID será generado por Firestore dentro de addExpense si no se provee en el modelo.
+        await expenseProvider.addExpense(expense.copyWith(
+          createdBy: authProvider.user?.id,
+          // Si ExpenseModel.id es nullable y se genera en FirestoreService.addExpense,
+          // no es necesario pasarlo aquí. Si es requerido, asegurarse que se genere antes.
+        ));
+      }
+
       await FirebaseAnalytics.instance.logEvent(
         name: 'import_expenses',
         parameters: {
@@ -222,8 +229,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving imported expenses: ${e.toString()}')),
-      );
+        SnackBar(content: Text('Error saving imported expenses: ${e.toString()}')),);
     }
   }
 
@@ -232,15 +238,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     final group = widget.group;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
-    final ScrollController scrollController = ScrollController();
+    // El ScrollController para PaginatedExpenseList se maneja internamente en ese widget.
+    // Este _mainScrollController es para el SingleChildScrollView de toda la pantalla.
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA), // Considerar mover a tema de la app
+      backgroundColor: const Color(0xFFF6F8FA),
       floatingActionButton: _buildFloatingActionButtons(context, user),
       body: ScrollConfiguration(
-        behavior: const ScrollBehavior(), // Para quitar el glow en web/desktop
+        behavior: const ScrollBehavior(),
         child: SingleChildScrollView(
-          controller: scrollController,
+          controller: _mainScrollController, // Usar el ScrollController principal aquí
           child: Column(
             children: [
               Header(
@@ -309,39 +316,30 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                               final users = userSnapshot.data ?? [];
                               final usersById = {for (var u in users) u.id: u};
                               final currentUserId = user?.id ?? '';
-
-                              return StreamBuilder<List<ExpenseModel>>(
-                                stream: _getGroupExpenses(group.id),
-                                builder: (context, expenseSnapshot) {
-                                  if (expenseSnapshot.connectionState == ConnectionState.waiting) {
-                                    return const Center(child: CircularProgressIndicator());
-                                  }
-                                  final expenses = expenseSnapshot.data ?? [];
-                                  
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Expenses:',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
-                                      ),
-                                      const SizedBox(height: 10),
-                                      PaginatedExpenseList(
-                                        expenses: expenses,
-                                        usersById: usersById,
-                                        currentUserId: currentUserId,
-                                        groupName: widget.group.name,
-                                        showExpenseDetail: _showExpenseDetail,
-                                      ),
-                                      const SizedBox(height: 32),
-                                      GroupBalancesCard(
-                                        group: group,
-                                        expenses: expenses,
-                                        usersById: usersById,
-                                      ),
-                                    ],
-                                  );
-                                },
+                              
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Expenses:',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // Ya no se usa StreamBuilder aquí para los gastos.
+                                  // PaginatedExpenseList consumirá del ExpenseProvider.
+                                  PaginatedExpenseList(
+                                    groupId: group.id, // Pasar el groupId
+                                    usersById: usersById,
+                                    currentUserId: currentUserId,
+                                    groupName: widget.group.name,
+                                    showExpenseDetail: _showExpenseDetail,
+                                  ),
+                                  const SizedBox(height: 32),
+                                  GroupBalancesCard(
+                                    group: group,
+                                    usersById: usersById,
+                                  ),
+                                ],
                               );
                             },
                           ),
@@ -489,8 +487,20 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               );
               return;
             }
-            final expenses = await _getGroupExpenses(widget.group.id).first; // Obtener la lista actual de gastos
+            // Obtener gastos del ExpenseProvider en lugar de _getGroupExpenses
+            final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
+            // Asegurarse que los gastos son para el grupo actual
+            // Si el groupId del provider no coincide, podría ser un estado intermedio.
+            // Idealmente, loadExpenses ya se llamó y los gastos están disponibles.
+            if (expenseProvider.currentGroupId != widget.group.id) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Expense data is not ready for this group yet. Please wait a moment and try again.')),
+                );
+                return;
+            }
+            final expenses = expenseProvider.expenses; 
             final String fileName = "expenses_${widget.group.name.replaceAll(' ', '_')}.csv";
+            // ... rest of the export logic ...
             final String csvDataString = ExportService().exportExpensesToCsv(expenses, users, widget.group.name);
 
             if (kIsWeb) {

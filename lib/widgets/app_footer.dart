@@ -8,7 +8,8 @@ class AppFooter extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      color: const Color(0xFFF6F8FA),
+      margin: const EdgeInsets.only(top: 20),
+      color: const Color.fromARGB(255, 225, 247, 244),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

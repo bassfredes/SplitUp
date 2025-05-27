@@ -30,18 +30,27 @@ class _ExpenseTileState extends State<ExpenseTile> {
     final expense = widget.expense;
     final usersById = widget.usersById;
     final currentUserId = widget.currentUserId;
-    final payerId = expense.payers.isNotEmpty ? expense.payers.first['userId'] as String : expense.createdBy;
+    final payerId =
+        expense.payers.isNotEmpty
+            ? expense.payers.first['userId'] as String
+            : expense.createdBy;
     final payer = usersById[payerId];
-    final avatar = (payer != null && payer.photoUrl != null && payer.photoUrl!.isNotEmpty)
-        ? CircleAvatar(backgroundImage: NetworkImage(payer.photoUrl!), radius: 22)
-        : CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.teal[100],
-            child: Text(
-              payer != null && payer.name.isNotEmpty ? payer.name[0].toUpperCase() : '?',
-              style: const TextStyle(fontSize: 22, color: Colors.white),
-            ),
-          );
+    final avatar =
+        (payer != null && payer.photoUrl != null && payer.photoUrl!.isNotEmpty)
+            ? CircleAvatar(
+              backgroundImage: NetworkImage(payer.photoUrl!),
+              radius: 22,
+            )
+            : CircleAvatar(
+              radius: 22,
+              backgroundColor: Colors.teal[100],
+              child: Text(
+                payer != null && payer.name.isNotEmpty
+                    ? payer.name[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(fontSize: 22, color: Colors.white),
+              ),
+            );
     final categoryIcon = _getCategoryIcon(expense.category);
     // final textColor = DefaultTextStyle.of(context).style.color;
     double userShare = 0.0;
@@ -63,14 +72,22 @@ class _ExpenseTileState extends State<ExpenseTile> {
       }
     }
     final net = paidByUser - userShare;
-    final netColor = net < 0 ? Colors.red : (net > 0 ? Colors.green : Colors.grey[700]);
-    final netLabel = net < 0 ? 'You owe' : (net > 0 ? 'You are owed' : 'Settled');
+    final netColor =
+        net < 0 ? Colors.red : (net > 0 ? Colors.green : Colors.grey[700]);
+    final netLabel =
+        net < 0 ? 'You owe' : (net > 0 ? 'You are owed' : 'Settled');
 
     final isMobile = MediaQuery.of(context).size.width < 600;
     final categoryColor = getCategoryColor(expense.category ?? 'otros');
     final borderRadius = BorderRadius.circular(isMobile ? 14 : 18);
-    final padding = EdgeInsets.symmetric(vertical: isMobile ? 12 : 18, horizontal: isMobile ? 12 : 18);
-    final margin = EdgeInsets.symmetric(vertical: isMobile ? 6 : 10, horizontal: 0);
+    final padding = EdgeInsets.symmetric(
+      vertical: isMobile ? 12 : 18,
+      horizontal: isMobile ? 12 : 18,
+    );
+    final margin = EdgeInsets.symmetric(
+      vertical: isMobile ? 6 : 10,
+      horizontal: 0,
+    );
 
     Widget content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,13 +102,21 @@ class _ExpenseTileState extends State<ExpenseTile> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 padding: const EdgeInsets.all(8),
-                child: Icon(categoryIcon, color: categoryColor, size: isMobile ? 20 : 22),
+                child: Icon(
+                  categoryIcon,
+                  color: categoryColor,
+                  size: isMobile ? 20 : 22,
+                ),
               ),
             if (categoryIcon != null) const SizedBox(width: 10),
             Expanded(
               child: Text(
                 _formatAmountWithCurrency(expense.amount, expense.currency),
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 18 : 22, color: categoryColor),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isMobile ? 18 : 22,
+                  color: categoryColor,
+                ),
               ),
             ),
             avatar,
@@ -100,7 +125,10 @@ class _ExpenseTileState extends State<ExpenseTile> {
         const SizedBox(height: 8),
         Text(
           expense.description,
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: isMobile ? 14 : 16),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: isMobile ? 14 : 16,
+          ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
@@ -109,7 +137,12 @@ class _ExpenseTileState extends State<ExpenseTile> {
           children: [
             const Icon(Icons.person, size: 16, color: Colors.grey),
             const SizedBox(width: 4),
-            Flexible(child: Text('Paid by: ${payer?.name ?? payerId}', style: const TextStyle(fontSize: 14, color: Colors.grey))),
+            Flexible(
+              child: Text(
+                'Paid by: ${payer?.name ?? payerId}',
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -117,18 +150,33 @@ class _ExpenseTileState extends State<ExpenseTile> {
           children: [
             const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
             const SizedBox(width: 4),
-            Text(expense.date.toLocal().toString().split(' ')[0], style: const TextStyle(fontSize: 13, color: Colors.grey)),
+            Text(
+              expense.date.toLocal().toString().split(' ')[0],
+              style: const TextStyle(fontSize: 13, color: Colors.grey),
+            ),
           ],
         ),
         const SizedBox(height: 4),
         Row(
           children: [
-            Icon(net < 0 ? Icons.arrow_upward : (net > 0 ? Icons.arrow_downward : Icons.check_circle), size: 16, color: netColor),
+            Icon(
+              net < 0
+                  ? Icons.arrow_upward
+                  : (net > 0 ? Icons.arrow_downward : Icons.check_circle),
+              size: 16,
+              color: netColor,
+            ),
             const SizedBox(width: 4),
             Flexible(
               child: Text(
-                net != 0 ? '$netLabel: ${_formatAmountWithCurrency(net.abs(), expense.currency)}' : 'Settled: ${_formatAmountWithCurrency(0, expense.currency)}',
-                style: TextStyle(color: netColor, fontWeight: FontWeight.w600, fontSize: 14),
+                net != 0
+                    ? '$netLabel: ${_formatAmountWithCurrency(net.abs(), expense.currency)}'
+                    : 'Settled: ${_formatAmountWithCurrency(0, expense.currency)}',
+                style: TextStyle(
+                  color: netColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
               ),
             ),
           ],
@@ -144,24 +192,40 @@ class _ExpenseTileState extends State<ExpenseTile> {
         curve: Curves.easeInOut,
         margin: margin,
         decoration: BoxDecoration(
- color: _hovering ? categoryColor.withAlpha((0.08 * 255).round()) : Colors.white,
+          color:
+              _hovering
+                  ? categoryColor.withAlpha((0.08 * 255).round())
+                  : Colors.white,
           border: Border.all(
-            color: _hovering ? categoryColor : categoryColor.withAlpha((0.35 * 255).round()),
+            color:
+                _hovering
+                    ? categoryColor
+                    : categoryColor.withAlpha((0.35 * 255).round()),
             width: 1.5,
-),
-          boxShadow: _hovering
-? [BoxShadow(color: categoryColor.withAlpha((0.13 * 255).round()), blurRadius: isMobile ? 8 : 16, offset: const Offset(0, 4))]
-: [BoxShadow(color: Colors.black.withAlpha((0.03 * 255).round()), blurRadius: isMobile ? 4 : 8, offset: const Offset(0, 2))],
+          ),
+          boxShadow:
+              _hovering
+                  ? [
+                    BoxShadow(
+                      color: categoryColor.withAlpha((0.13 * 255).round()),
+                      blurRadius: isMobile ? 8 : 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                  : [
+                    BoxShadow(
+                      color: Colors.black.withAlpha((0.03 * 255).round()),
+                      blurRadius: isMobile ? 4 : 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             borderRadius: borderRadius,
             onTap: widget.onTap,
-            child: Padding(
-              padding: padding,
-              child: content,
-            ),
+            child: Padding(padding: padding, child: content),
           ),
         ),
       ),

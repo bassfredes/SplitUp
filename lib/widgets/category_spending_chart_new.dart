@@ -6,6 +6,7 @@ import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
 import '../config/category_colors.dart';
 import '../utils/formatters.dart'; // Importar formatters
+import '../config/constants.dart'; // Importar kExpenseCategories
 
 class CategorySpendingChart extends StatefulWidget {
   final String? groupId;
@@ -40,6 +41,24 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
     });
   }
 
+  String _getCategoryDisplayLabel(String categoryKey) {
+    if (categoryKey == 'Sin categoría') return 'Uncategorized';
+    
+    final categoryEntry = kExpenseCategories.firstWhere(
+      (cat) => cat['key'] == categoryKey,
+      orElse: () => <String, dynamic>{}, 
+    );
+
+    if (categoryEntry.isNotEmpty && categoryEntry.containsKey('label')) {
+      return categoryEntry['label'] as String;
+    }
+    
+    // Para categorías personalizadas que no están en kExpenseCategories o si la clave está vacía
+    if (categoryKey.isEmpty) return 'Uncategorized';
+    // Capitalizar la primera letra y dejar el resto como está (asumiendo que las personalizadas ya podrían tener mayúsculas)
+    return categoryKey[0].toUpperCase() + categoryKey.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.groupId == null) {
@@ -65,7 +84,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(),
+              _buildPeriodSelector(), // Solo el selector de período, el título se movió
               const SizedBox(height: 16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,7 +107,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(),
+              _buildPeriodSelector(), // Solo el selector de período, el título se movió
               const SizedBox(height: 16),
               _buildChart(expenseProvider.expenses),
               const SizedBox(height: 8),
@@ -100,17 +119,12 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildPeriodSelector() { // Renombrado de _buildHeader a _buildPeriodSelector
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.end, // Alinea el dropdown a la derecha
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Text(
-          'Category Spending',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        // El título se ha movido a dashboard_screen.dart
         MouseRegion(
           onEnter: (_) => setState(() => _isDropdownHovered = true),
           onExit: (_) => setState(() => _isDropdownHovered = false),
@@ -264,7 +278,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
             width: 18, // Ligeramente más pequeño
             height: 18, // Ligeramente más pequeño
             decoration: BoxDecoration(
-              color: getCategoryColor(data.category),
+              color: getCategoryColor(data.category), // la clave de categoría se usa aquí para el color
               shape: BoxShape.circle,
             ),
           ),
@@ -272,7 +286,7 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
             children: [
               Expanded(
                 child: Text(
-                  data.category.isNotEmpty ? data.category : 'Uncategorized',
+                  _getCategoryDisplayLabel(data.category), // Usar el label de visualización
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
@@ -390,12 +404,12 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> {
 
     // Ordenar gastos por fecha, más recientes primero
     final categoryExpenses = expenses
-        .where((e) => (e.category ?? 'Uncategorized') == category)
+        .where((e) => (e.category ?? 'Uncategorized') == category) // Filtrar por la clave de categoría
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
     
     final totalAmount = categoryExpenses.fold<double>(0, (sum, e) => sum + e.amount);
-    final categoryColor = getCategoryColor(category);
+    final categoryColor = getCategoryColor(category); // Usar la clave de categoría para el color
     
     // Calcular el porcentaje que representa esta categoría del total
     final allExpensesTotal = expenses.fold<double>(0, (sum, e) => sum + e.amount);
