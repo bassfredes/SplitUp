@@ -327,6 +327,39 @@ void main() {
         expect(lastExpenseFromMap['date'], testDateMillis); // Should be int for cache
       });
 
+      test('toMap forCache specifically with DateTime input for date', () {
+        final dateTimeSpecificLastExpense = {
+          'id': 'expDT_cache',
+          'description': 'DateTime to Cache Test',
+          'amount': 10.0,
+          'date': DateTime(2025, 1, 1, 12, 0, 0), // Explicit DateTime
+          'paidBy': 'userDT'
+        };
+        final group = createBaseGroup(lastExpense: dateTimeSpecificLastExpense, useDefaultLastExpense: false);
+        final map = group.toMap(forCache: true);
+        // Aseguramos que date no es null y es DateTime antes de acceder a millisecondsSinceEpoch
+        final dateValue = dateTimeSpecificLastExpense['date'];
+        expect(dateValue, isA<DateTime>());
+        expect(map['lastExpense']!['date'], (dateValue as DateTime).millisecondsSinceEpoch);
+      });
+
+      test('toMap forFirestore specifically with DateTime input for date', () {
+        final dateTimeSpecificLastExpense = {
+          'id': 'expDT_firestore',
+          'description': 'DateTime to Firestore Test',
+          'amount': 20.0,
+          'date': DateTime(2025, 2, 2, 15, 0, 0), // Explicit DateTime
+          'paidBy': 'userDT'
+        };
+        final group = createBaseGroup(lastExpense: dateTimeSpecificLastExpense, useDefaultLastExpense: false);
+        final map = group.toMap(forCache: false); // for Firestore
+        expect(map['lastExpense']!['date'], isA<Timestamp>());
+        // Aseguramos que date no es null y es DateTime antes de la comparación
+        final dateValue = dateTimeSpecificLastExpense['date'];
+        expect(dateValue, isA<DateTime>());
+        expect((map['lastExpense']!['date'] as Timestamp).toDate(), dateValue as DateTime);
+      });
+
       test('toMap handles null optional fields correctly', () {
         final group = createBaseGroup(
           description: null,
