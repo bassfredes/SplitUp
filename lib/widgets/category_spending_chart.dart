@@ -117,14 +117,90 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> with Tick
 
     return Consumer<ExpenseProvider>(
       builder: (context, expenseProvider, _) {
-        if (expenseProvider.expenses.isEmpty) {
-          return const Card(
+        // Filter expenses and calculate category data
+        final filteredExpensesForChart = _filterExpensesByPeriod(expenseProvider.expenses);
+        final finalCategoryData = _calculateCategoryData(filteredExpensesForChart);
+
+        Widget chartOrEmptyMessageWidget;
+
+        if (finalCategoryData.isEmpty) {
+          _hasLoadAnimationPlayed = false;
+          chartOrEmptyMessageWidget = const Center(
             child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('No expenses to show in this group.'),
+              padding: EdgeInsets.all(24.0),
+              child: Text('No expense data to display for the selected period.'),
+            ),
+          );
+        } else {
+          if (!_hasLoadAnimationPlayed) {
+            _loadAnimationController?.forward(from: 0.0);
+            _hasLoadAnimationPlayed = true;
+          }
+          // Obtener el código de moneda de los gastos filtrados
+          final String currencyCode = filteredExpensesForChart.isNotEmpty ? filteredExpensesForChart.first.currency : '';
+          chartOrEmptyMessageWidget = PieChart(
+            PieChartData(
+              sectionsSpace: 0,
+              centerSpaceRadius: 60,
+              sections: _buildChartSections(finalCategoryData), // Use finalCategoryData
+              pieTouchData: PieTouchData(
+                touchCallback: (FlTouchEvent event, PieTouchResponse? pieTouchResponse) {
+                  setState(() {
+                    if (!event.isInterestedForInteractions) {
+                      if (_hoveredSectionIndex != -1) {
+                        _hoverAnimationController?.reverse();
+                        _hoveredSectionIndex = -1;
+                      }
+                      return;
+                    }
+
+                    if (event is FlPointerHoverEvent || event is FlTapDownEvent) {
+                      if (pieTouchResponse != null && pieTouchResponse.touchedSection != null) {
+                        if (_hoveredSectionIndex != pieTouchResponse.touchedSection!.touchedSectionIndex) {
+                          _hoveredSectionIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                          _hoverAnimationController?.forward(from: 0.0);
+                        } else if (!_hoverAnimationController!.isAnimating && _hoverAnimationController!.status == AnimationStatus.dismissed) {
+                          _hoverAnimationController?.forward(from: 0.0);
+                        }
+                      } else {
+                        if (_hoveredSectionIndex != -1) {
+                          _hoverAnimationController?.reverse();
+                          _hoveredSectionIndex = -1;
+                        }
+                      }
+                    } else if (event is FlPointerExitEvent) {
+                      if (_hoveredSectionIndex != -1) {
+                        _hoverAnimationController?.reverse();
+                        _hoveredSectionIndex = -1;
+                      }
+                    }
+                  });
+
+                  if (event is FlTapUpEvent) {
+                    final touchedIndex = pieTouchResponse?.touchedSection?.touchedSectionIndex;
+                    // Use finalCategoryData here
+                    if (touchedIndex != null && touchedIndex >= 0 && touchedIndex < finalCategoryData.length) {
+                      final categoryKey = finalCategoryData[touchedIndex].category;
+                      // Use filteredExpensesForChart here
+                      _showCategoryDetails(categoryKey, filteredExpensesForChart, currencyCode);
+                    }
+                  }
+                },
+              ),
             ),
           );
         }
+
+        final Widget animatedChartArea = FadeTransition(
+          opacity: _fadeAnimation!,
+          child: SlideTransition(
+            position: _slideAnimation!,
+            child: SizedBox(
+              height: 200,
+              child: chartOrEmptyMessageWidget,
+            ),
+          ),
+        );
 
         // Determinar si es vista de escritorio
         final isDesktop = MediaQuery.of(context).size.width >= 600;
@@ -141,12 +217,13 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> with Tick
                 children: [
                   Expanded(
                     flex: 2, // Gráfico toma más espacio
-                    child: _buildChart(expenseProvider.expenses),
+                    child: animatedChartArea,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     flex: 3, // Leyenda toma menos espacio o se ajusta
-                    child: _buildLegend(expenseProvider.expenses),
+                    // Conditionally render legend
+                    child: finalCategoryData.isNotEmpty ? _buildLegend(expenseProvider.expenses) : const SizedBox.shrink(),
                   ),
                 ],
               ),
@@ -159,9 +236,10 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> with Tick
             children: [
               _buildHeader(),
               const SizedBox(height: 16),
-              _buildChart(expenseProvider.expenses),
+              animatedChartArea,
               const SizedBox(height: 8),
-              _buildLegend(expenseProvider.expenses),
+              // Conditionally render legend
+              if (finalCategoryData.isNotEmpty) _buildLegend(expenseProvider.expenses),
             ],
           );
         }
@@ -320,101 +398,35 @@ class _CategorySpendingChartState extends State<CategorySpendingChart> with Tick
     );
   }
 
+  // _buildChart is no longer needed as its logic is moved to the main build method.
+  // Consider removing _buildChart if it's not used elsewhere, or simplify it if it still has a purpose.
+  // For now, we'll keep it commented out or remove it later if confirmed it's entirely redundant.
+  /* 
   Widget _buildChart(List<ExpenseModel> expenses) {
-    final filteredExpenses = _filterExpensesByPeriod(expenses);
-    final categoryData = _calculateCategoryData(filteredExpenses);
-    
-    if (categoryData.isEmpty) {
-      // Si no hay datos, resetear la bandera de animación para que se ejecute la próxima vez que haya datos.
-      _hasLoadAnimationPlayed = false; 
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Text('No expense data to display'),
-        ),
-      );
-    }
-
-    // Disparar animación de carga si hay datos y no se ha reproducido
-    if (!_hasLoadAnimationPlayed) {
-      _loadAnimationController?.forward(from: 0.0); // Asegurar que comience desde el principio
-      _hasLoadAnimationPlayed = true;
-    }
-
-    // Obtener el código de moneda de los gastos filtrados
-    final String currencyCode = filteredExpenses.isNotEmpty ? filteredExpenses.first.currency : '';
-
-    // Envolver con FadeTransition y SlideTransition
-    return FadeTransition(
-      opacity: _fadeAnimation!,
-      child: SlideTransition(
-        position: _slideAnimation!,
-        child: SizedBox(
-          height: 200,
-          child: PieChart( // Se elimina el Stack y el Center para quitar el total del centro
-            PieChartData(
-              sectionsSpace: 0, // Eliminamos el espacio entre secciones
-              centerSpaceRadius: 60, // Aumentar para un agujero central más grande
-              sections: _buildChartSections(categoryData),
-              pieTouchData: PieTouchData(
-                touchCallback: (FlTouchEvent event, PieTouchResponse? pieTouchResponse) {
-                  setState(() {
-                    if (!event.isInterestedForInteractions) {
-                      if (_hoveredSectionIndex != -1) {
-                        _hoverAnimationController?.reverse();
-                        _hoveredSectionIndex = -1;
-                      }
-                      return;
-                    }
-
-                    if (event is FlPointerHoverEvent || event is FlTapDownEvent) {
-                      if (pieTouchResponse != null && pieTouchResponse.touchedSection != null) {
-                        if (_hoveredSectionIndex != pieTouchResponse.touchedSection!.touchedSectionIndex) {
-                          _hoveredSectionIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-                          _hoverAnimationController?.forward(from: 0.0);
-                        } else if (!_hoverAnimationController!.isAnimating && _hoverAnimationController!.status == AnimationStatus.dismissed) {
-                          // Si ya está seleccionada y la animación está en dismissed, iniciarla.
-                          _hoverAnimationController?.forward(from: 0.0);
-                        }
-                      } else {
-                        if (_hoveredSectionIndex != -1) {
-                          _hoverAnimationController?.reverse();
-                          _hoveredSectionIndex = -1;
-                        }
-                      }
-                    } else if (event is FlPointerExitEvent) {
-                      if (_hoveredSectionIndex != -1) {
-                        _hoverAnimationController?.reverse();
-                        _hoveredSectionIndex = -1;
-                      }
-                    }
-                  });
-
-                  // Lógica para el tap (mostrar detalles)
-                  if (event is FlTapUpEvent) {
-                    final touchedIndex = pieTouchResponse?.touchedSection?.touchedSectionIndex;
-                    if (touchedIndex != null && touchedIndex >= 0 && touchedIndex < categoryData.length) {
-                      final categoryKey = categoryData[touchedIndex].category;
-                      _showCategoryDetails(categoryKey, filteredExpenses, currencyCode);
-                    }
-                  }
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    // This logic is now in the main build method.
+    // ...
   }
-
+  */
   
   Widget _buildLegend(List<ExpenseModel> expenses) {
+    // Note: _buildLegend is called with expenseProvider.expenses.
+    // It internally filters by period and calculates category data.
+    // This is consistent with its previous behavior.
+    // If _buildLegend should use pre-filtered expenses (filteredExpensesForChart from build method),
+    // then its signature and internal logic would need to change.
+    // For now, keeping it as is, assuming it needs the full list to potentially show different totals or details.
     final filteredExpenses = _filterExpensesByPeriod(expenses);
     final categoryData = _calculateCategoryData(filteredExpenses);
     final overallTotalAmount = filteredExpenses.fold<double>(0, (sum, e) => sum + e.amount); // Total general
     
+    // This check might seem redundant if _buildLegend is only called when finalCategoryData is not empty.
+    // However, _buildLegend does its own filtering. If the main build method's finalCategoryData
+    // is based on filteredExpensesForChart, and _buildLegend also filters expenseProvider.expenses,
+    // they should ideally yield the same emptiness state for the *selected period*.
+    // If there's a possibility of discrepancy (e.g. different filtering logic or timing), this check is a safeguard.
+    // For now, assuming the filtering in build() and buildLegend() for the selected period will be consistent.
     if (categoryData.isEmpty) {
-      return const SizedBox.shrink();
+      return const SizedBox.shrink(); 
     }
 
     // Obtener el código de moneda de los gastos filtrados
