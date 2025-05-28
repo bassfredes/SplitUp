@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Descomentado: Necesario para FieldValue y Firestore.instance
 import '../models/group_model.dart';
 import '../models/user_model.dart';
 import '../models/expense_model.dart';
@@ -417,7 +416,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               final UserModel? invitedUser = await showInviteParticipantDialog(context);
               if (invitedUser != null) {
                 if (!mounted) return;
-                if (widget.group.participantIds.contains(invitedUser.id)) {
+                // Comprobar si el participante ya existe usando el GroupModel más reciente del Provider
+                // o, si se prefiere, el `widget.group` que se actualiza a través de `_loadParticipants`.
+                // Para mayor consistencia, sería ideal que `widget.group` siempre refleje el estado más actual.
+                final currentGroup = Provider.of<GroupProvider>(context, listen: false)
+                    .groups
+                    .firstWhere((g) => g.id == widget.group.id, orElse: () => widget.group);
+
+                if (currentGroup.participantIds.contains(invitedUser.id)) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('${invitedUser.name} is already a member of this group.')),
                   );
@@ -425,21 +431,55 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 }
                 setState(() => _participantsLoading = true);
                 try {
-                  final groupRef = FirebaseFirestore.instance.collection('groups').doc(widget.group.id);
-                  final newRole = {'uid': invitedUser.id, 'role': 'member'}; // Considerar roles más granulares
-                  await groupRef.update({
-                    'participantIds': FieldValue.arrayUnion([invitedUser.id]),
-                    'roles': FieldValue.arrayUnion([newRole])
-                  });
+                  final groupProvider = Provider.of<GroupProvider>(context, listen: false);
+                  // Guardar el grupo actualizado devuelto por el provider
+                  final updatedGroup = await groupProvider.addParticipantToGroup(widget.group.id, invitedUser);
+
                   await FirebaseAnalytics.instance.logEvent(
                     name: 'invite_participant',
                     parameters: {
                       'group_id': widget.group.id,
-                      'group_name': widget.group.name,
+                      'group_name': widget.group.name, // Considerar usar updatedGroup.name si puede cambiar
                       'invited_user_id': invitedUser.id,
                     },
                   );
-                  _loadParticipants(); // Recargar la lista de participantes
+                  
+                  // Actualizar el estado local con el grupo modificado y recargar participantes
+                  // Esto es crucial si `widget.group` no se actualiza automáticamente.
+                  // Sin embargo, `_loadParticipants` usa `widget.group.participantIds`.
+                  // Si `addParticipantToGroup` en el provider actualiza su lista interna `_groups`
+                  // y `GroupDetailScreen` escucha esos cambios (o el `widget.group` se actualiza
+                  // a través de un stream superior), entonces `_loadParticipants()` podría ser suficiente
+                  // si se llama DESPUÉS de que `widget.group` se haya actualizado.
+
+                  // Opción 1: Confiar en que el GroupProvider y el stream actualicen widget.group
+                  // y luego _loadParticipants use los IDs actualizados.
+                  // _loadParticipants(); // Ya está aquí.
+
+                  // Opción 2: Forzar la actualización de la UI de participantes usando el `updatedGroup` directamente.
+                  // Esto es más directo si `widget.group` no se actualiza inmediatamente.
+                  // Primero, actualiza el `_participantsFuture` con los nuevos IDs del `updatedGroup`.
+                  setState(() {
+                    // Actualiza el widget.group localmente si es necesario y si este GroupDetailScreen
+                    // no se reconstruye automáticamente cuando el GroupProvider notifica cambios.
+                    // Si GroupDetailScreen SÍ se reconstruye, esta línea podría ser redundante o causar doble estado.
+                    // widget.group = updatedGroup; // Esto no es posible porque widget.group es final.
+
+                    // En lugar de modificar widget.group, actualizamos el _participantsFuture
+                    // basándonos en los participantIds del updatedGroup.
+                    _participantsFuture = _fetchParticipantsByIds(updatedGroup.participantIds).whenComplete(() {
+                      if (mounted) {
+                        setState(() {
+                          _participantsLoading = false;
+                        });
+                      }
+                    });
+                  });
+                  // Luego, si _loadParticipants() hace más que solo setear _participantsFuture (ej. cambiar _participantsLoading),
+                  // podría ser necesario llamarlo o replicar su lógica relevante aquí.
+                  // Por ahora, la actualización directa de _participantsFuture y _participantsLoading debería ser suficiente.
+
+
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('${invitedUser.name} has been successfully added to the group.')),

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'config/firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/group_provider.dart';
+import 'providers/expense_provider.dart'; // Import ExpenseProvider
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/group_detail_screen.dart';
@@ -117,7 +118,7 @@ class SplitUpApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
-        // Agrega aquí otros providers si es necesario
+        // ExpenseProvider NO se añade aquí globalmente, se proporcionará por ruta
       ],
       child: MaterialApp(
         // Envuelve el contenido con FirestoreUsageWidget tras proveer Directionality
@@ -178,18 +179,25 @@ class SplitUpApp extends StatelessWidget {
             if (segments.length == 2) {
               final groupId = segments[1];
               return MaterialPageRoute(
-                builder: (context) => FutureBuilder(
-                  future: FirestoreService().getGroup(groupId).first,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-                    }
-                    if (!snapshot.hasData || snapshot.data == null) {
-                      return const Scaffold(body: Center(child: Text('Grupo no encontrado')));
-                    }
-                    return GroupDetailScreen(group: snapshot.data!);
-                  },
-                ),
+                builder: (context) {
+                  // Proporcionar ExpenseProvider aquí, específico para esta instancia de GroupDetailScreen
+                  return ChangeNotifierProvider<ExpenseProvider>(
+                    create: (_) => ExpenseProvider(),
+                    child: FutureBuilder(
+                      future: FirestoreService().getGroup(groupId).first,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                        }
+                        if (!snapshot.hasData || snapshot.data == null) {
+                          return const Scaffold(body: Center(child: Text('Group not found')));
+                        }
+                        // GroupDetailScreen ahora tendrá acceso a ExpenseProvider
+                        return GroupDetailScreen(group: snapshot.data!);
+                      },
+                    ),
+                  );
+                },
                 settings: settings,
               );
             }

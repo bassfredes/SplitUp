@@ -139,22 +139,27 @@ class GroupInfoCard extends StatelessWidget {
                     if (confirm == true) {
                       // No es necesario setState(() => _participantsLoading = true); aquí, se maneja en la pantalla principal
                       try {
+                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                        final currentUserId = authProvider.user?.id;
+                        if (currentUserId == null) {
+                          throw Exception("User not authenticated");
+                        }
                         await Provider.of<GroupProvider>(context, listen: false)
-                            .removeParticipantAndRedistribute(group.id, user.id);
+                            .removeParticipantFromGroup(group.id, user.id, currentUserId);
+
+                        // La actualización de Firestore para participantIds y roles AHORA se maneja DENTRO de FirestoreService.removeParticipantFromGroup.
+                        // Por lo tanto, las siguientes líneas que actualizan Firestore directamente aquí son redundantes y pueden ser eliminadas.
+                        // final groupRef = FirebaseFirestore.instance.collection('groups').doc(group.id);
+                        // final currentGroupDoc = await groupRef.get();
+                        // final currentRoles = List<Map<String, dynamic>>.from(currentGroupDoc.data()?['roles'] ?? []);
                         
-                        // Actualizar Firestore directamente para participantIds y roles
-                        // (GroupProvider debería manejar esto idealmente, pero para mantener la lógica original)
-                        final groupRef = FirebaseFirestore.instance.collection('groups').doc(group.id);
-                        final currentGroupDoc = await groupRef.get();
-                        final currentRoles = List<Map<String, dynamic>>.from(currentGroupDoc.data()?['roles'] ?? []);
-                        
-                        await groupRef.update({
-                          'participantIds': FieldValue.arrayRemove([user.id]),
-                          'roles': currentRoles.where((r) => r['uid'] != user.id).toList(),
-                        });
+                        // await groupRef.update({
+                        //   'participantIds': FieldValue.arrayRemove([user.id]),
+                        //   'roles': currentRoles.where((r) => r['uid'] != user.id).toList(),
+                        // });
 
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('${user.name} removed and debts redistributed.')),
+                          SnackBar(content: Text('${user.name} removed.')), // Mensaje actualizado ya que la redistribución es parte de la operación
                         );
                         onParticipantRemoved(); // Llama al callback para recargar
                       } catch (e) {

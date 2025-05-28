@@ -2,6 +2,7 @@ import 'dart:async'; // Necesario para StreamSubscription
 
 import 'package:flutter/material.dart';
 import '../models/group_model.dart';
+import '../models/user_model.dart';
 import '../services/firestore_service.dart';
 
 class GroupProvider extends ChangeNotifier {
@@ -104,18 +105,64 @@ class GroupProvider extends ChangeNotifier {
     // El loading se manejará dentro de loadUserGroups
   }
 
-  Future<void> removeParticipantAndRedistribute(String groupId, String userId) async {
-    // Considerar si esta operación debe forzar un refresco de la lista de grupos
-    // o si los cambios se reflejarán adecuadamente a través del stream existente (si está activo).
-    // Por ahora, se asume que un refresco podría ser necesario si los datos del grupo cambian.
+  Future<GroupModel> addParticipantToGroup(String groupId, UserModel invitedUser) async {
     _loading = true;
-    if(!_isDisposed) notifyListeners();
+    if (!_isDisposed) notifyListeners();
     try {
-      await _firestoreService.removeParticipantFromExpenses(groupId, userId);
-      // Opcional: Forzar refresco si es probable que la información del grupo (participantes, etc.) cambie.
-      // await loadUserGroups(userId, forceRefresh: true); 
+      // Llama al servicio de Firestore para añadir el participante
+      final updatedGroup = await _firestoreService.addParticipantToGroup(groupId, invitedUser);
+      
+      // Actualizar el grupo en la lista local o recargar la lista de grupos.
+      final index = _groups.indexWhere((g) => g.id == groupId);
+      if (index != -1) {
+        _groups[index] = updatedGroup;
+      } else {
+        // Si el grupo no estaba en la lista (poco probable en este flujo),
+        // podríamos añadirlo o decidir recargar todo dependiendo de la lógica de la app.
+        // Por ahora, si no se encuentra, no hacemos nada con la lista local,
+        // asumiendo que una futura carga/stream lo traerá.
+        // Opcionalmente, se podría añadir: _groups.add(updatedGroup);
+        // pero esto podría llevar a duplicados si la carga general ocurre después.
+        // La opción más segura si no se encuentra es forzar un refresh completo,
+        // aunque esto es menos eficiente.
+        // await loadUserGroups(authProvider.user!.id, forceRefresh: true); // Necesitaría userId
+      }
+      return updatedGroup; // Devolver el grupo actualizado
     } catch (e) {
-      print("Error al remover participante y redistribuir: $e");
+      print("Error al añadir participante en GroupProvider: $e");
+      rethrow;
+    } finally {
+      _loading = false;
+      if (!_isDisposed) notifyListeners();
+    }
+  }
+
+  Future<void> removeParticipantFromGroup(String groupId, String userIdToRemove, String currentUserId) async {
+    _loading = true;
+    if (!_isDisposed) notifyListeners();
+    try {
+      final updatedGroup = await _firestoreService.removeParticipantFromGroup(groupId, userIdToRemove, currentUserId);
+
+      // Actualizar el grupo en la lista local
+      final index = _groups.indexWhere((g) => g.id == groupId);
+      if (index != -1) {
+        _groups[index] = updatedGroup;
+      }
+      // Si el grupo se elimina porque el usuario actual fue eliminado (y ya no tiene acceso),
+      // la lista de grupos del usuario actual se refrescará naturalmente
+      // la próxima vez que se llame a loadUserGroups o a través del stream.
+
+      // Si el currentUserId es el mismo que userIdToRemove, y el usuario fue removido exitosamente
+      // (lo cual no debería pasar si es admin, pero por si acaso),
+      // entonces ese grupo ya no debería estar en su lista.
+      // Podríamos removerlo explícitamente de _groups o confiar en loadUserGroups.
+      if (currentUserId == userIdToRemove) {
+        _groups.removeWhere((g) => g.id == groupId);
+      }
+      
+    } catch (e) {
+      print("Error al remover participante en GroupProvider: $e");
+      rethrow; // Para que la UI pueda manejarlo
     } finally {
       _loading = false;
       if (!_isDisposed) notifyListeners();

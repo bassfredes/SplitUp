@@ -175,6 +175,35 @@ class FirestoreService {
     return controller.stream;
   }
 
+  Future<GroupModel> addParticipantToGroup(String groupId, UserModel invitedUser) async {
+    final groupRef = _db.collection('groups').doc(groupId);
+    final newRole = {
+      'uid': invitedUser.id,
+      'role': 'member', // Default role
+      // Considerar añadir más detalles del usuario aquí si es necesario para 'roles'
+      // 'name': invitedUser.name,
+      // 'email': invitedUser.email,
+    };
+
+    await groupRef.update({
+      'participantIds': FieldValue.arrayUnion([invitedUser.id]),
+      'roles': FieldValue.arrayUnion([newRole])
+    });
+    _monitor.logWrite();
+
+    // Invalidar caché para este grupo específico
+    await _cache.removeData('group_$groupId');
+    print("Cache invalidated for group: $groupId after adding participant.");
+
+    // Opcional: Invalidar la lista de grupos en caché para el usuario invitado,
+    // ya que su lista de grupos ha cambiado.
+    await _cache.removeData('user_groups_${invitedUser.id}');
+    print("Cache invalidated for user_groups list for user: ${invitedUser.id}");
+
+    // Devolver el grupo actualizado obteniéndolo de nuevo (lo que también actualizará la caché si es necesario)
+    return await getGroupOnce(groupId);
+  }
+
   // Gastos
   Future<void> addExpense(ExpenseModel expense) async {
     await _db.collection('groups').doc(expense.groupId)
@@ -337,16 +366,92 @@ class FirestoreService {
       }
       // Recalcular montos si es división igualitaria
       double newAmount = expense.amount;
-      if (expense.customSplits == null && newParticipantIds.isNotEmpty) {
+      if (expense.customSplits == null && newParticipantIds.isNotEmpty && expense.participantIds.isNotEmpty) { // Evitar división por cero
         newAmount = expense.amount * newParticipantIds.length / expense.participantIds.length;
+      } else if (newParticipantIds.isEmpty) {
+        // Considerar qué hacer si no quedan participantes en el gasto.
+        // Podría ser eliminar el gasto o marcarlo como inválido.
+        // Por ahora, se podría dejar el monto como está o ponerlo a 0 si se elimina el gasto.
+        // Si se mantiene el gasto, pero sin participantes, el monto podría no tener sentido.
+        // Aquí asumimos que el gasto se mantiene y el monto no cambia si no hay recalculo.
       }
+
       await _db.collection('groups').doc(groupId).collection('expenses').doc(expense.id).update({
         'participantIds': newParticipantIds,
         'customSplits': newCustomSplits,
-        'amount': newAmount,
+        'amount': newAmount, // Asegúrate que newAmount se calcula correctamente
       });
       _monitor.logWrite();
     }
+    // Invalidar caché de gastos del grupo después de modificar los gastos
+    await _cache.removeData('group_expenses_$groupId');
+    print("Cache invalidated for group_expenses: $groupId after removing participant from expenses.");
+  }
+
+  Future<GroupModel> removeParticipantFromGroup(String groupId, String userIdToRemove, String currentUserId) async {
+    final groupRef = _db.collection('groups').doc(groupId);
+
+    // Primero, remover al participante de todos los gastos y redistribuir si es necesario.
+    // Esta llamada ya invalida 'group_expenses_groupId'
+    await removeParticipantFromExpenses(groupId, userIdToRemove);
+
+    // Luego, actualizar el documento del grupo para remover al participante de participantIds y roles.
+    // Es importante obtener el documento del grupo *antes* de la actualización para poder filtrar el array de roles.
+    final groupDoc = await groupRef.get();
+    if (!groupDoc.exists) {
+      throw Exception("Group not found: $groupId");
+    }
+    final groupData = groupDoc.data();
+    if (groupData == null) {
+      throw Exception("Group data is null for: $groupId");
+    }
+
+    final String adminId = groupData['adminId'] as String? ?? '';
+    if (userIdToRemove == adminId) {
+      // Adicionalmente, verificar si es el único participante.
+      // Aunque la lógica principal es no remover al admin, si es el único,
+      // el grupo debería ser eliminado en lugar de dejar un admin solitario que no se puede ir.
+      // Sin embargo, la acción de "eliminar grupo" es separada. Por ahora, solo prevenimos remover al admin.
+      final List<dynamic> participantIds = groupData['participantIds'] ?? [];
+      if (participantIds.length == 1 && participantIds.contains(adminId)) {
+        // Podrías lanzar un error más específico o manejarlo de forma diferente.
+        // Por ejemplo, "El administrador es el único miembro y no puede ser eliminado. Elimine el grupo en su lugar."
+        // Pero por consistencia con el objetivo de no remover al admin, este error es suficiente.
+        throw Exception("The group administrator cannot be removed, especially if they are the only participant. Consider deleting the group instead.");
+      }
+      throw Exception("The group administrator cannot be removed.");
+    }
+
+    final List<dynamic> currentRoles = groupData['roles'] ?? [];
+    final updatedRoles = currentRoles.where((role) {
+      if (role is Map<String, dynamic>) {
+        return role['uid'] != userIdToRemove;
+      }
+      return true; // Mantener roles si no tienen el formato esperado (aunque esto no debería ocurrir)
+    }).toList();
+
+    await groupRef.update({
+      'participantIds': FieldValue.arrayRemove([userIdToRemove]),
+      'roles': updatedRoles,
+    });
+    _monitor.logWrite();
+
+    // Invalidar caché para este grupo específico
+    await _cache.removeData('group_$groupId');
+    print("Cache invalidated for group: $groupId after removing participant.");
+
+    // Invalidar la lista de grupos en caché para el usuario que fue removido
+    await _cache.removeData('user_groups_$userIdToRemove');
+    print("Cache invalidated for user_groups list for user: $userIdToRemove");
+    
+    // Invalidar la lista de grupos en caché para el usuario actual (quien realizó la acción),
+    // por si la información del grupo (como la lista de participantes) se muestra en su dashboard.
+    await _cache.removeData('user_groups_$currentUserId');
+    print("Cache invalidated for user_groups list for current user: $currentUserId");
+
+
+    // Devolver el grupo actualizado
+    return await getGroupOnce(groupId);
   }
 
   // Liquidaciones
