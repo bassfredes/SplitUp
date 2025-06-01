@@ -19,10 +19,20 @@ class FirestoreService {
       : _db = firestore ?? FirebaseFirestore.instance,
         _cache = cacheService ?? CacheService(),
         _connectivity = connectivityService ?? ConnectivityService() {
-    // Habilitar persistencia offline solo si no estamos usando una instancia mock de Firestore
-    // (FakeFirebaseFirestore no soporta settings directamente en el constructor de esta manera)
-    if (firestore == null) {
-      _db.settings = const Settings(persistenceEnabled: true, cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED);
+    // Habilitar persistencia offline para todas las instancias reales de FirebaseFirestore.
+    // Se excluyen instancias simuladas como FakeFirebaseFirestore, que podrían no soportar 'settings'.
+    // Esta lógica asume que FakeFirebaseFirestore().runtimeType.toString() es 'FakeFirebaseFirestore'.
+    if (_db.runtimeType.toString() != 'FakeFirebaseFirestore') {
+      // Solo intentar establecer la configuración si no es una instancia conocida de mock.
+      // Esto permite la persistencia para FirebaseFirestore.instance y para instancias
+      // reales de FirebaseFirestore inyectadas.
+      try {
+        _db.settings = const Settings(persistenceEnabled: true, cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED);
+      } catch (e) {
+        // Salvaguarda en caso de que una instancia inesperada cause problemas al configurar 'settings'.
+        // Esto no debería ocurrir con instancias reales de Firestore para estas configuraciones.
+        print('Advertencia: No se pudo aplicar la configuración de persistencia de Firestore a ${_db.runtimeType}: $e');
+      }
     }
   }
 
@@ -380,14 +390,21 @@ class FirestoreService {
       return;
     }
 
+    final int maxOperationsPerBatch = 499; // Límite de Firestore es 500, 499 es más seguro
+    int operationsInCurrentBatch = 0;
     WriteBatch batch = _db.batch();
-    bool batchHasOperations = false;
 
     for (final doc in expensesSnap.docs) {
       final expense = ExpenseModel.fromMap(doc.data(), doc.id);
       if (!expense.participantIds.contains(userId)) continue;
       
-      batchHasOperations = true; 
+      // Si el lote actual está lleno, confirmarlo y comenzar uno nuevo.
+      if (operationsInCurrentBatch >= maxOperationsPerBatch) {
+        await batch.commit();
+        _monitor.logWrite(); // Registrar después de cada confirmación exitosa
+        batch = _db.batch(); // Crear un nuevo lote
+        operationsInCurrentBatch = 0; // Restablecer contador para el nuevo lote
+      }
 
       final potentialNewParticipantIds = List<String>.from(expense.participantIds)..remove(userId);
 
@@ -413,11 +430,13 @@ class FirestoreService {
         
         batch.update(doc.reference, updateData);
       }
+      operationsInCurrentBatch++; // Incrementar por la operación de eliminación o actualización agregada
     }
 
-    if (batchHasOperations) {
+    // Confirmar cualquier operación restante en el último lote.
+    if (operationsInCurrentBatch > 0) {
       await batch.commit();
-      _monitor.logWrite();
+      _monitor.logWrite(); // Registrar para la confirmación del lote final
     }
     
     await _cache.removeData('group_expenses_$groupId');
