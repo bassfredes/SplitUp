@@ -15,6 +15,8 @@ class GroupModel {
   final double totalExpenses; // Nuevo campo
   final int expensesCount; // Nuevo campo
   final Map<String, dynamic>? lastExpense; // Nuevo campo
+  final DateTime createdAt; // Nuevo campo
+  final DateTime updatedAt; // Nuevo campo
 
   GroupModel({
     required this.id,
@@ -30,7 +32,10 @@ class GroupModel {
     this.totalExpenses = 0.0, // Valor por defecto
     this.expensesCount = 0, // Valor por defecto
     this.lastExpense, // Valor por defecto
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) : createdAt = createdAt ?? DateTime.now(), // Inicializar aquí
+       updatedAt = updatedAt ?? DateTime.now(); // Inicializar aquí
 
   factory GroupModel.fromMap(Map<String, dynamic> map, String id) {
     // Parsear la lista de balances
@@ -74,6 +79,18 @@ class GroupModel {
       // Por ahora, solo manejamos explícitamente int y Timestamp del mapa.
     }
 
+    DateTime parseDate(dynamic dateInput) {
+      if (dateInput is Timestamp) {
+        return dateInput.toDate();
+      }
+      if (dateInput is int) {
+        return DateTime.fromMillisecondsSinceEpoch(dateInput);
+      }
+      if (dateInput is String) {
+        return DateTime.tryParse(dateInput) ?? DateTime.now();
+      }
+      return DateTime.now(); // Valor por defecto si no se puede parsear
+    }
 
     return GroupModel(
       id: id,
@@ -89,6 +106,8 @@ class GroupModel {
       totalExpenses: (map['totalExpenses'] as num?)?.toDouble() ?? 0.0, // Parsear nuevo campo
       expensesCount: (map['expensesCount'] as num?)?.toInt() ?? 0, // Parsear nuevo campo
       lastExpense: parsedLastExpense, // Usar el lastExpense procesado
+      createdAt: parseDate(map['createdAt']), // Parsear createdAt
+      updatedAt: parseDate(map['updatedAt']), // Parsear updatedAt
     );
   }
 
@@ -128,6 +147,8 @@ class GroupModel {
       'totalExpenses': totalExpenses,
       'expensesCount': expensesCount,
       'lastExpense': processedLastExpense, // Usar el lastExpense procesado
+      'createdAt': forCache ? createdAt.millisecondsSinceEpoch : Timestamp.fromDate(createdAt),
+      'updatedAt': forCache ? updatedAt.millisecondsSinceEpoch : Timestamp.fromDate(updatedAt),
     };
   }
 }

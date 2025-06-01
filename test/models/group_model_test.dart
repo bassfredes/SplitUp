@@ -86,6 +86,8 @@ void main() {
       // pasarán `lastExpense: null`.
       Map<String, dynamic>? lastExpense,
       bool useDefaultLastExpense = true, // Nuevo parámetro para controlar el comportamiento por defecto
+      DateTime? createdAt, // Nuevo campo
+      DateTime? updatedAt, // Nuevo campo
     }) {
       Map<String, dynamic>? finalLastExpense;
       if (useDefaultLastExpense) {
@@ -107,6 +109,8 @@ void main() {
         totalExpenses: totalExpenses,
         expensesCount: expensesCount,
         lastExpense: finalLastExpense,
+        createdAt: createdAt, // Pasar el valor al constructor de GroupModel
+        updatedAt: updatedAt, // Pasar el valor al constructor de GroupModel
       );
     }
 
@@ -137,11 +141,17 @@ void main() {
       expect(group.totalExpenses, 150.75);
       expect(group.expensesCount, 5);
       expect(group.lastExpense, baseLastExpenseModel);
+      expect(group.createdAt, isA<DateTime>());
+      expect(group.updatedAt, isA<DateTime>());
     });
 
     group('fromMap', () {
       test('creates an instance from a map with all fields', () {
-        final group = GroupModel.fromMap(baseGroupMap, 'group1');
+        final groupMapWithTimestamps = Map<String, dynamic>.from(baseGroupMap);
+        groupMapWithTimestamps['createdAt'] = Timestamp.now();
+        groupMapWithTimestamps['updatedAt'] = Timestamp.now();
+
+        final group = GroupModel.fromMap(groupMapWithTimestamps, 'group1');
         expect(group.id, 'group1');
         expect(group.name, 'Test Group');
         expect(group.description, 'A group for testing');
@@ -171,6 +181,8 @@ void main() {
         // fromMap converts date in lastExpense to DateTime for the model object
         expectedLastExpenseModel['date'] = testDate; 
         expect(group.lastExpense, expectedLastExpenseModel);
+        expect(group.createdAt, isA<DateTime>()); 
+        expect(group.updatedAt, isA<DateTime>()); 
       });
 
       test('handles missing optional fields with defaults', () {
@@ -179,7 +191,7 @@ void main() {
           'participantIds': ['user3'],
           'adminId': 'user3',
           'roles': [{'uid': 'user3', 'role': 'admin'}],
-          // No optional fields, including participantBalances, totalExpenses, expensesCount, lastExpense
+          // No optional fields, incluyendo participantBalances, totalExpenses, expensesCount, lastExpense
         };
         final group = GroupModel.fromMap(minimalMap, 'group2');
         expect(group.id, 'group2');
@@ -194,6 +206,8 @@ void main() {
         expect(group.totalExpenses, 0.0); // Default
         expect(group.expensesCount, 0); // Default
         expect(group.lastExpense, isNull); // Default
+        expect(group.createdAt, isA<DateTime>()); 
+        expect(group.updatedAt, isA<DateTime>());
       });
 
       test('handles participantBalances with invalid items or empty balances', () {
@@ -254,6 +268,8 @@ void main() {
           'totalExpenses': null, // Will default to 0.0
           'expensesCount': null, // Will default to 0
           'lastExpense': null,
+          'createdAt': null, 
+          'updatedAt': null,
         };
         final group = GroupModel.fromMap(mapWithNullOptionals, 'group_null_opt');
         expect(group.description, isNull);
@@ -262,6 +278,8 @@ void main() {
         expect(group.totalExpenses, 0.0);
         expect(group.expensesCount, 0);
         expect(group.lastExpense, isNull);
+        expect(group.createdAt, isA<DateTime>()); 
+        expect(group.updatedAt, isA<DateTime>()); 
       });
 
        test('fromMap handles lastExpense with date as int (cache format)', () {
@@ -281,6 +299,8 @@ void main() {
         // fromMap converts int date in lastExpense to DateTime for the model object
         expectedLastExpenseModel['date'] = testDate; 
         expect(group.lastExpense, expectedLastExpenseModel);
+        expect(group.createdAt, isA<DateTime>());
+        expect(group.updatedAt, isA<DateTime>());
       });
     });
 
@@ -317,6 +337,8 @@ void main() {
         final expectedLastExpenseToMap = Map<String, dynamic>.from(baseLastExpenseModel);
         expectedLastExpenseToMap['date'] = testTimestamp; 
         expect(map['lastExpense'], expectedLastExpenseToMap);
+        expect(map['createdAt'], isA<Timestamp>()); 
+        expect(map['updatedAt'], isA<Timestamp>()); 
       });
 
       test('converts an instance to a map for cache (lastExpense date as int)', () {
@@ -325,6 +347,8 @@ void main() {
 
         final lastExpenseFromMap = map['lastExpense'] as Map<String, dynamic>; 
         expect(lastExpenseFromMap['date'], testDateMillis); // Should be int for cache
+        expect(map['createdAt'], isA<int>()); 
+        expect(map['updatedAt'], isA<int>()); 
       });
 
       test('toMap forCache specifically with DateTime input for date', () {
@@ -341,6 +365,8 @@ void main() {
         final dateValue = dateTimeSpecificLastExpense['date'];
         expect(dateValue, isA<DateTime>());
         expect(map['lastExpense']!['date'], (dateValue as DateTime).millisecondsSinceEpoch);
+        expect(map['createdAt'], group.createdAt.millisecondsSinceEpoch);
+        expect(map['updatedAt'], group.updatedAt.millisecondsSinceEpoch);
       });
 
       test('toMap forFirestore specifically with DateTime input for date', () {
@@ -358,6 +384,10 @@ void main() {
         final dateValue = dateTimeSpecificLastExpense['date'];
         expect(dateValue, isA<DateTime>());
         expect((map['lastExpense']!['date'] as Timestamp).toDate(), dateValue as DateTime);
+        expect(map['createdAt'], isA<Timestamp>());
+        expect((map['createdAt'] as Timestamp).toDate(), group.createdAt);
+        expect(map['updatedAt'], isA<Timestamp>());
+        expect((map['updatedAt'] as Timestamp).toDate(), group.updatedAt);
       });
 
       test('toMap handles null optional fields correctly', () {
@@ -376,12 +406,16 @@ void main() {
         expect(map['photoUrl'], isNull);
         expect(map.containsKey('lastExpense'), isTrue);
         expect(map['lastExpense'], isNull); // Now expects null
+        expect(map['createdAt'], isNotNull); 
+        expect(map['updatedAt'], isNotNull); 
       });
 
       test('toMap for cache handles null lastExpense', () {
         final group = createBaseGroup(lastExpense: null, useDefaultLastExpense: false); // Asegura que el null se use
         final map = group.toMap(forCache: true);
         expect(map['lastExpense'], isNull); // Now expects null
+        expect(map['createdAt'], group.createdAt.millisecondsSinceEpoch);
+        expect(map['updatedAt'], group.updatedAt.millisecondsSinceEpoch);
       });
 
       test('toMap for cache handles lastExpense with int date already (no change)', () {
@@ -395,6 +429,8 @@ void main() {
         final group = createBaseGroup(lastExpense: lastExpenseWithIntDate);
         final map = group.toMap(forCache: true);
         expect(map['lastExpense']['date'], testDateMillis);
+        expect(map['createdAt'], group.createdAt.millisecondsSinceEpoch);
+        expect(map['updatedAt'], group.updatedAt.millisecondsSinceEpoch);
       });
 
       test('toMap for Firestore handles lastExpense with Timestamp date already (no change)', () {
@@ -415,10 +451,14 @@ void main() {
 
         final groupWithTimestampInLastExpense = GroupModel(
           id: 'g1', name: 'N', participantIds: [], adminId: 'a', roles: [],
-          lastExpense: lastExpenseWithTimestampDate // Directly assign map with Timestamp
+          lastExpense: lastExpenseWithTimestampDate,
+          createdAt: DateTime.now(), // Añadir createdAt
+          updatedAt: DateTime.now(), // Añadir updatedAt
         );
         final map = groupWithTimestampInLastExpense.toMap(forCache: false);
         expect(map['lastExpense']['date'], testTimestamp);
+        expect(map['createdAt'], isA<Timestamp>());
+        expect(map['updatedAt'], isA<Timestamp>());
       });
 
     });

@@ -2,15 +2,29 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:meta/meta.dart'; // Añadir import
 
 /// Servicio para monitorear el estado de la conectividad y reducir
 /// las operaciones de Firestore cuando el usuario está offline
 class ConnectivityService with WidgetsBindingObserver {
   // Singleton
-  static final ConnectivityService _instance = ConnectivityService._internal();
+  static ConnectivityService _instance = ConnectivityService._internal(Connectivity());
+  static ConnectivityService get instance => _instance;
+
+  // Para permitir la anulación en pruebas
+  static void setInstance(ConnectivityService service) {
+    _instance = service;
+  }
+
+  /// Establece una instancia de ConnectivityService con un mock de Connectivity para pruebas.
+  @visibleForTesting
+  static void setInstanceForTest(Connectivity connectivity) {
+    _instance = ConnectivityService._internal(connectivity);
+  }
+
   factory ConnectivityService() => _instance;
 
-  final Connectivity _connectivity = Connectivity();
+  final Connectivity _connectivity; // Modificado para inyección
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   
   // Estado de la conectividad
@@ -21,7 +35,8 @@ class ConnectivityService with WidgetsBindingObserver {
   final _connectionStatusController = StreamController<bool>.broadcast();
   Stream<bool> get connectionStream => _connectionStatusController.stream;
   
-  ConnectivityService._internal() {
+  // Constructor modificado para aceptar Connectivity
+  ConnectivityService._internal(this._connectivity) {
     _initializeService();
   }
 
