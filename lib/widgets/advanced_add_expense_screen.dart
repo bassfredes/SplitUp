@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:provider/provider.dart'; // Added Provider
+import '../providers/expense_provider.dart'; // Added ExpenseProvider
 import '../models/expense_model.dart';
 import '../models/user_model.dart';
 import '../services/firestore_service.dart';
@@ -437,7 +439,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
       final customSplits = _splitType == 'equal'
           ? null
           : _customSplits.entries.map((e) => {'userId': e.key, 'amount': e.value}).toList();
-      final firestoreService = FirestoreService();
+      // final firestoreService = FirestoreService(); // No longer needed directly for update
       print('[DEBUG] Datos para Firestore:');
       print('payers: $payers');
       print('customSplits: ${customSplits?.toString() ?? 'null'}');
@@ -461,13 +463,16 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           currency: _currency,
         );
         print('[DEBUG] updatedExpense.toMap(): ${updatedExpense.toMap()}');
-        await firestoreService.updateExpense(updatedExpense);
+        // await firestoreService.updateExpense(updatedExpense); // Replaced
+        await Provider.of<ExpenseProvider>(context, listen: false).updateExpense(updatedExpense);
         setState(() => _loading = false);
         if (!mounted) return;
-        Navigator.pop(context, updatedExpense);
+        Navigator.pop(context, updatedExpense); // Pop with the updated expense
       } else {
+        // Logic for adding a new expense remains the same, using FirestoreService directly or via provider if preferred
+        final firestoreService = FirestoreService(); // Keep for addExpense if not using provider for it
         final expense = ExpenseModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          id: DateTime.now().millisecondsSinceEpoch.toString(), // Firestore generates ID, this might be temp
           groupId: widget.groupId,
           description: _descController.text.trim(),
           amount: amount,
@@ -484,6 +489,7 @@ class _AdvancedAddExpenseScreenState extends State<AdvancedAddExpenseScreen> {
           currency: _currency,
         );
         print('[DEBUG] expense.toMap(): ${expense.toMap()}');
+        // If addExpense is also moved to provider, this would change too. For now, it's direct.
         await firestoreService.addExpense(expense);
         await FirebaseAnalytics.instance.logEvent(
           name: 'add_payment',

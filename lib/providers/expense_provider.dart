@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:convert'; // Added for jsonEncode and jsonDecode
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/expense_model.dart';
 import '../models/settlement_model.dart';
 import '../services/firestore_service.dart';
+import '../services/cache_service.dart'; // Assuming CacheService is here
 
 class ExpenseProvider extends ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
+  final CacheService _cacheService = CacheService(); // Added CacheService instance
   List<ExpenseModel> _expenses = [];
   List<SettlementModel> _settlements = [];
   bool _loadingExpenses = false;
@@ -53,6 +56,30 @@ class ExpenseProvider extends ChangeNotifier {
     _loadingExpenses = true;
     if (!_isDisposed) notifyListeners();
 
+    // --- Cache Logic Start ---
+    if (!forceRefresh) {
+      final cacheKey = 'group_expenses_${groupId}_page_0';
+      final cachedPayload = _cacheService.getData(cacheKey) as Map<String, dynamic>?;
+
+      if (cachedPayload != null) {
+        _expenses = (jsonDecode(cachedPayload['expenses'] as String) as List<dynamic>)
+            .map((map) => ExpenseModel.fromMap(map as Map<String, dynamic>, map['id'] as String))
+            .toList();
+        final String? lastDocPath = cachedPayload['lastDocPath'] as String?;
+        if (lastDocPath != null) {
+          _lastExpenseDocument = await _firestoreService.getDocumentSnapshot(lastDocPath);
+        } else {
+          _lastExpenseDocument = null;
+        }
+        _hasMoreExpenses = cachedPayload['hasMore'] as bool;
+        _loadingExpenses = false;
+        if (!_isDisposed) notifyListeners();
+        print("ExpenseProvider: Primera página de gastos cargada desde CACHÉ para el grupo $groupId.");
+        return;
+      }
+    }
+    // --- Cache Logic End ---
+
     try {
       final expenseList = await _firestoreService.getExpensesPaginated(
         groupId,
@@ -70,6 +97,17 @@ class ExpenseProvider extends ChangeNotifier {
       }
       _hasMoreExpenses = expenseList.length == _pageSize;
       
+      // --- Cache Storing Logic Start ---
+      final cacheKey = 'group_expenses_${groupId}_page_0';
+      final pageDataToCache = {
+        'expenses': jsonEncode(_expenses.map((e) => e.toMap(forCache: true)).toList()),
+        'lastDocPath': _lastExpenseDocument?.reference.path,
+        'hasMore': _hasMoreExpenses,
+      };
+      await _cacheService.setData(cacheKey, pageDataToCache);
+      print("ExpenseProvider: Primera página de gastos guardada en CACHÉ para el grupo $groupId.");
+      // --- Cache Storing Logic End ---
+
       print("ExpenseProvider: Primera página de gastos cargada para el grupo $groupId. Hay más: $_hasMoreExpenses");
 
     } catch (e) {
@@ -105,6 +143,37 @@ class ExpenseProvider extends ChangeNotifier {
     _loadingMoreExpenses = true;
     if (!_isDisposed) notifyListeners();
 
+    // --- Cache Logic Start ---
+    final String? previousLastDocId = _lastExpenseDocument?.id;
+    if (previousLastDocId == null || previousLastDocId.isEmpty) {
+      _loadingMoreExpenses = false;
+      if (!_isDisposed) notifyListeners();
+      print("ExpenseProvider: Error - loadMoreExpenses llamado sin un lastExpenseDocument válido.");
+      return;
+    }
+
+    final cacheKey = 'group_expenses_${groupId}_after_${previousLastDocId}';
+    final cachedPayload = _cacheService.getData(cacheKey) as Map<String, dynamic>?;
+
+    if (cachedPayload != null) {
+      final List<ExpenseModel> newExpenses = (jsonDecode(cachedPayload['expenses'] as String) as List<dynamic>)
+          .map((map) => ExpenseModel.fromMap(map as Map<String, dynamic>, map['id'] as String))
+          .toList();
+      _expenses.addAll(newExpenses);
+      final String? lastDocPath = cachedPayload['lastDocPath'] as String?;
+      if (lastDocPath != null) {
+        _lastExpenseDocument = await _firestoreService.getDocumentSnapshot(lastDocPath);
+      } else {
+        _lastExpenseDocument = null;
+      }
+      _hasMoreExpenses = cachedPayload['hasMore'] as bool;
+      _loadingMoreExpenses = false;
+      if (!_isDisposed) notifyListeners();
+      print("ExpenseProvider: Siguiente página de gastos cargada desde CACHÉ para el grupo $groupId after $previousLastDocId.");
+      return;
+    }
+    // --- Cache Logic End ---
+
     try {
       print("ExpenseProvider: Cargando más gastos para el grupo $groupId después de ${_lastExpenseDocument?.id}");
       final expenseList = await _firestoreService.getExpensesPaginated(
@@ -119,9 +188,24 @@ class ExpenseProvider extends ChangeNotifier {
         _lastExpenseDocument = await _firestoreService.getDocumentSnapshot(
           'groups/$groupId/expenses/${expenseList.last.id}'
         );
+         _expenses.addAll(expenseList); // Add new expenses to the list
+      } else {
+        // No new expenses were fetched, which might mean _lastExpenseDocument should not change,
+        // or it's the definitive end of the list.
       }
-      _expenses.addAll(expenseList);
+
       _hasMoreExpenses = expenseList.length == _pageSize;
+
+      // --- Cache Storing Logic Start ---
+      final cacheKeyForStorage = 'group_expenses_${groupId}_after_${previousLastDocId}';
+      final pageDataToCache = {
+        'expenses': jsonEncode(expenseList.map((e) => e.toMap(forCache: true)).toList()),
+        'lastDocPath': _lastExpenseDocument?.reference.path,
+        'hasMore': _hasMoreExpenses,
+      };
+      await _cacheService.setData(cacheKeyForStorage, pageDataToCache);
+      print("ExpenseProvider: Siguiente página de gastos guardada en CACHÉ para el grupo $groupId.");
+      // --- Cache Storing Logic End ---
 
       print("ExpenseProvider: Siguiente página de gastos cargada. Total: ${_expenses.length}. Hay más: $_hasMoreExpenses");
 
@@ -139,11 +223,30 @@ class ExpenseProvider extends ChangeNotifier {
   Future<void> addExpense(ExpenseModel expense) async {
     try {
       await _firestoreService.addExpense(expense);
+      // --- Cache Invalidation Start ---
+      await _cacheService.removeKeysWithPattern('group_expenses_${expense.groupId}_');
+      print("ExpenseProvider: Caché de paginación invalidada para el grupo ${expense.groupId} debido a nuevo gasto.");
+      // --- Cache Invalidation End ---
       if (_currentGroupId == expense.groupId) {
         await loadExpenses(expense.groupId, forceRefresh: true);
       }
     } catch (e) {
       print("Error al añadir gasto: $e");
+    }
+  }
+
+  Future<void> updateExpense(ExpenseModel expense) async {
+    try {
+      await _firestoreService.updateExpense(expense);
+      await _cacheService.removeKeysWithPattern('group_expenses_${expense.groupId}_');
+      print("ExpenseProvider: Caché de paginación invalidada para el grupo ${expense.groupId} debido a actualización de gasto.");
+      // Solo recargar si el grupo actual es el afectado.
+      if (_currentGroupId == expense.groupId) {
+        await loadExpenses(expense.groupId, forceRefresh: true);
+      }
+    } catch (e) {
+      print("Error al actualizar gasto: $e");
+      // Considera re-lanzar el error o manejarlo de forma más específica si es necesario
     }
   }
 
