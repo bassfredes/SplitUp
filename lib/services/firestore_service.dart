@@ -9,15 +9,21 @@ import './firestore_monitor.dart';
 import './connectivity_service.dart';
 
 class FirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final CacheService _cache = CacheService();
+  final FirebaseFirestore _db;
+  final CacheService _cache;
   final FirestoreMonitor _monitor = FirestoreMonitor();
-  final ConnectivityService _connectivity = ConnectivityService();
+  final ConnectivityService _connectivity;
   
   // Constructor con inicialización de persistencia de Firestore
-  FirestoreService() {
-    // Habilitar persistencia offline
-    _db.settings = const Settings(persistenceEnabled: true, cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED);
+  FirestoreService({FirebaseFirestore? firestore, CacheService? cacheService, ConnectivityService? connectivityService})
+      : _db = firestore ?? FirebaseFirestore.instance,
+        _cache = cacheService ?? CacheService(),
+        _connectivity = connectivityService ?? ConnectivityService() {
+    // Habilitar persistencia offline solo si no estamos usando una instancia mock de Firestore
+    // (FakeFirebaseFirestore no soporta settings directamente en el constructor de esta manera)
+    if (firestore == null) {
+      _db.settings = const Settings(persistenceEnabled: true, cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED);
+    }
   }
 
   // Grupos
@@ -29,9 +35,12 @@ class FirestoreService {
   }
 
   Future<void> deleteGroup(String groupId) async {
+    // Clean nested data first to avoid orphans
+    await cleanGroupExpensesAndSettlements(groupId);
     await _db.collection('groups').doc(groupId).delete();
     _monitor.logWrite();
     // Limpiar caché asociada al grupo eliminado
+    // Estas invalidaciones son distintas de las realizadas en cleanGroupExpensesAndSettlements
     await _cache.removeKeysWithPattern('group_${groupId}_');
     await _cache.removeData('group_$groupId');
     await _cache.removeKeysWithPattern('user_groups_');
@@ -225,6 +234,14 @@ class FirestoreService {
     await _cache.removeData('group_expenses_${expense.groupId}');
   }
   
+  Future<void> deleteExpense(String groupId, String expenseId) async {
+    await _db.collection('groups').doc(groupId)
+      .collection('expenses').doc(expenseId).delete();
+    _monitor.logWrite();
+    // Invalidate cache of expenses for the group
+    await _cache.removeData('group_expenses_$groupId');
+  }
+  
   // Método para obtener gastos una sola vez (sin stream) - con monitor y optimizaciones
   Future<List<ExpenseModel>> getExpensesOnce(String groupId) async {
     // Verificar caché primero
@@ -355,49 +372,65 @@ class FirestoreService {
   Future<void> removeParticipantFromExpenses(String groupId, String userId) async {
     final expensesSnap = await _db.collection('groups').doc(groupId).collection('expenses').get();
     _monitor.logRead('expenses');
+
+    if (expensesSnap.docs.isEmpty) {
+      // No hay gastos, no hay nada que hacer.
+      await _cache.removeData('group_expenses_$groupId');
+      print("Cache invalidated for group_expenses: $groupId (no expenses found to update).");
+      return;
+    }
+
+    WriteBatch batch = _db.batch();
+    bool batchHasOperations = false;
+
     for (final doc in expensesSnap.docs) {
       final expense = ExpenseModel.fromMap(doc.data(), doc.id);
       if (!expense.participantIds.contains(userId)) continue;
-      // Quitar participante
-      final newParticipantIds = List<String>.from(expense.participantIds)..remove(userId);
-      List<Map<String, dynamic>>? newCustomSplits;
-      if (expense.customSplits != null) {
-        newCustomSplits = expense.customSplits!.where((split) => split['userId'] != userId).toList();
-      }
-      // Recalcular montos si es división igualitaria
-      double newAmount = expense.amount;
-      if (expense.customSplits == null && newParticipantIds.isNotEmpty && expense.participantIds.isNotEmpty) { // Evitar división por cero
-        newAmount = expense.amount * newParticipantIds.length / expense.participantIds.length;
-      } else if (newParticipantIds.isEmpty) {
-        // Considerar qué hacer si no quedan participantes en el gasto.
-        // Podría ser eliminar el gasto o marcarlo como inválido.
-        // Por ahora, se podría dejar el monto como está o ponerlo a 0 si se elimina el gasto.
-        // Si se mantiene el gasto, pero sin participantes, el monto podría no tener sentido.
-        // Aquí asumimos que el gasto se mantiene y el monto no cambia si no hay recalculo.
-      }
+      
+      batchHasOperations = true; 
 
-      await _db.collection('groups').doc(groupId).collection('expenses').doc(expense.id).update({
-        'participantIds': newParticipantIds,
-        'customSplits': newCustomSplits,
-        'amount': newAmount, // Asegúrate que newAmount se calcula correctamente
-      });
+      final potentialNewParticipantIds = List<String>.from(expense.participantIds)..remove(userId);
+
+      if (potentialNewParticipantIds.isEmpty) {
+        batch.delete(doc.reference);
+      } else {
+        Map<String, dynamic> updateData = {
+          'participantIds': FieldValue.arrayRemove([userId]),
+        };
+
+        if (expense.customSplits != null) {
+          final newCustomSplits = expense.customSplits!
+              .where((split) => split['userId'] != userId)
+              .toList();
+          updateData['customSplits'] = newCustomSplits;
+        }
+
+        // Actualizar payers (campo no nullable).
+        final newPayers = expense.payers
+            .where((payer) => payer['userId'] != userId)
+            .toList();
+        updateData['payers'] = newPayers;
+        
+        batch.update(doc.reference, updateData);
+      }
+    }
+
+    if (batchHasOperations) {
+      await batch.commit();
       _monitor.logWrite();
     }
-    // Invalidar caché de gastos del grupo después de modificar los gastos
+    
     await _cache.removeData('group_expenses_$groupId');
-    print("Cache invalidated for group_expenses: $groupId after removing participant from expenses.");
+    print("Cache invalidated for group_expenses: $groupId after attempting to remove participant from expenses.");
   }
 
   Future<GroupModel> removeParticipantFromGroup(String groupId, String userIdToRemove, String currentUserId) async {
     final groupRef = _db.collection('groups').doc(groupId);
 
-    // Primero, remover al participante de todos los gastos y redistribuir si es necesario.
-    // Esta llamada ya invalida 'group_expenses_groupId'
-    await removeParticipantFromExpenses(groupId, userIdToRemove);
-
-    // Luego, actualizar el documento del grupo para remover al participante de participantIds y roles.
-    // Es importante obtener el documento del grupo *antes* de la actualización para poder filtrar el array de roles.
+    // Obtener el documento del grupo para realizar las validaciones
     final groupDoc = await groupRef.get();
+    _monitor.logRead('groups'); // Registrar lectura del grupo
+
     if (!groupDoc.exists) {
       throw Exception("Group not found: $groupId");
     }
@@ -407,27 +440,40 @@ class FirestoreService {
     }
 
     final String adminId = groupData['adminId'] as String? ?? '';
+    final List<dynamic> participantIdsDynamic = groupData['participantIds'] ?? [];
+    final List<String> participantIds = List<String>.from(participantIdsDynamic);
+
+    // 1. Verificar si el usuario actual es el administrador del grupo
+    if (adminId != currentUserId) {
+      throw Exception("Only the group administrator can remove participants.");
+    }
+
+    // 2. Verificar si el usuario a eliminar es realmente un participante del grupo
+    if (!participantIds.contains(userIdToRemove)) {
+      throw Exception("Participant with ID '$userIdToRemove' not found in group '$groupId'.");
+    }
+
+    // 3. Verificar si se intenta eliminar al administrador (esta lógica ya existía y es correcta)
     if (userIdToRemove == adminId) {
-      // Adicionalmente, verificar si es el único participante.
-      // Aunque la lógica principal es no remover al admin, si es el único,
-      // el grupo debería ser eliminado en lugar de dejar un admin solitario que no se puede ir.
-      // Sin embargo, la acción de "eliminar grupo" es separada. Por ahora, solo prevenimos remover al admin.
-      final List<dynamic> participantIds = groupData['participantIds'] ?? [];
-      if (participantIds.length == 1 && participantIds.contains(adminId)) {
-        // Podrías lanzar un error más específico o manejarlo de forma diferente.
-        // Por ejemplo, "El administrador es el único miembro y no puede ser eliminado. Elimine el grupo en su lugar."
-        // Pero por consistencia con el objetivo de no remover al admin, este error es suficiente.
-        throw Exception("The group administrator cannot be removed, especially if they are the only participant. Consider deleting the group instead.");
+      if (participantIds.length == 1) {
+        throw Exception("The group administrator is the only member and cannot be removed. Consider deleting the group instead.");
       }
       throw Exception("The group administrator cannot be removed.");
     }
 
+    // Si todas las validaciones pasan, proceder con la eliminación.
+
+    // Primero, remover al participante de todos los gastos y redistribuir si es necesario.
+    // Esta llamada ya invalida 'group_expenses_groupId'
+    await removeParticipantFromExpenses(groupId, userIdToRemove);
+
+    // Luego, actualizar el documento del grupo para remover al participante de participantIds y roles.
     final List<dynamic> currentRoles = groupData['roles'] ?? [];
     final updatedRoles = currentRoles.where((role) {
       if (role is Map<String, dynamic>) {
         return role['uid'] != userIdToRemove;
       }
-      return true; // Mantener roles si no tienen el formato esperado (aunque esto no debería ocurrir)
+      return true; 
     }).toList();
 
     await groupRef.update({
@@ -445,10 +491,10 @@ class FirestoreService {
     print("Cache invalidated for user_groups list for user: $userIdToRemove");
     
     // Invalidar la lista de grupos en caché para el usuario actual (quien realizó la acción),
-    // por si la información del grupo (como la lista de participantes) se muestra en su dashboard.
+    // ya que la información del grupo (como la lista de participantes) podría estar desactualizada.
+    // Esta invalidación ya estaba, pero es bueno confirmar su relevancia.
     await _cache.removeData('user_groups_$currentUserId');
     print("Cache invalidated for user_groups list for current user: $currentUserId");
-
 
     // Devolver el grupo actualizado
     return await getGroupOnce(groupId);
@@ -461,6 +507,13 @@ class FirestoreService {
     _monitor.logWrite();
     // Invalidar caché de liquidaciones
     await _cache.removeData('group_settlements_${settlement.groupId}');
+  }
+
+  Future<void> deleteSettlement(String groupId, String settlementId) async {
+    await _db.collection('groups').doc(groupId)
+      .collection('settlements').doc(settlementId).delete();
+    _monitor.logWrite();
+    await _cache.removeData('group_settlements_$groupId');
   }
 
   // Método para obtener liquidaciones una sola vez (sin stream)
@@ -528,17 +581,30 @@ class FirestoreService {
 
   // Limpia todos los gastos y liquidaciones de un grupo (antes de eliminarlo)
   Future<void> cleanGroupExpensesAndSettlements(String groupId) async {
+    WriteBatch batch = _db.batch();
+    bool batchHasOperations = false;
+
     final expensesSnap = await _db.collection('groups').doc(groupId).collection('expenses').get();
     _monitor.logRead('expenses');
-    for (final doc in expensesSnap.docs) {
-      await doc.reference.delete();
-      _monitor.logWrite();
+    if (expensesSnap.docs.isNotEmpty) {
+      for (final doc in expensesSnap.docs) {
+        batch.delete(doc.reference);
+        batchHasOperations = true;
+      }
     }
+
     final settlementsSnap = await _db.collection('groups').doc(groupId).collection('settlements').get();
     _monitor.logRead('settlements');
-    for (final doc in settlementsSnap.docs) {
-      await doc.reference.delete();
-      _monitor.logWrite();
+    if (settlementsSnap.docs.isNotEmpty) {
+      for (final doc in settlementsSnap.docs) {
+        batch.delete(doc.reference);
+        batchHasOperations = true;
+      }
+    }
+
+    if (batchHasOperations) {
+      await batch.commit();
+      _monitor.logWrite(); // Registrar una sola escritura para todas las eliminaciones
     }
     
     // Limpiar caché relacionada
@@ -606,6 +672,13 @@ class FirestoreService {
   }
 
   // OPERACIONES EN LOTE (BATCH)
+  
+  Future<void> updateGroup(GroupModel group) async {
+    await _db.collection('groups').doc(group.id).update(group.toMap());
+    _monitor.logWrite();
+    await _cache.removeData('group_${group.id}');
+    await _cache.removeKeysWithPattern('user_groups_');
+  }
   
   /// Actualiza varios documentos en una sola operación atómica
   Future<void> batchUpdate({

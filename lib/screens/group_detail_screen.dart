@@ -416,24 +416,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               final UserModel? invitedUser = await showInviteParticipantDialog(context);
               if (invitedUser != null) {
                 if (!mounted) return;
-                // Comprobar si el participante ya existe usando el GroupModel más reciente del Provider
-                // o, si se prefiere, el `widget.group` que se actualiza a través de `_loadParticipants`.
-                // Para mayor consistencia, sería ideal que `widget.group` siempre refleje el estado más actual.
-                final currentGroup = Provider.of<GroupProvider>(context, listen: false)
-                    .groups
-                    .firstWhere((g) => g.id == widget.group.id, orElse: () => widget.group);
 
-                if (currentGroup.participantIds.contains(invitedUser.id)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${invitedUser.name} is already a member of this group.')),
-                  );
-                  return;
-                }
                 setState(() => _participantsLoading = true);
                 try {
                   final groupProvider = Provider.of<GroupProvider>(context, listen: false);
-                  // Guardar el grupo actualizado devuelto por el provider
                   final updatedGroup = await groupProvider.addParticipantToGroup(widget.group.id, invitedUser);
+
+                  // La lógica para manejar participantes duplicados ahora reside en la capa de servicio/proveedor.
+                  // El servicio previene la adición de duplicados y devuelve el grupo sin cambios
+                  // si el participante ya es miembro. La UI simplemente refleja el estado del grupo devuelto.
+                  // Si se requiere un mensaje específico para "ya es miembro", el servicio debería proporcionarlo.
 
                   await FirebaseAnalytics.instance.logEvent(
                     name: 'invite_participant',

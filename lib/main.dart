@@ -144,66 +144,82 @@ class SplitUpApp extends StatelessWidget {
           '/welcome': (context) => const IntroductionAnimationScreen(), 
         },
         onGenerateRoute: (settings) {
-          // Rutas dinámicas para detalle de grupo
+          // Rutas dinámicas para la sección de grupos
           if (settings.name != null && settings.name!.startsWith('/group/')) {
-            final uri = Uri.parse(settings.name!);
-            final segments = uri.pathSegments;
-            
-            // Ruta para editar un gasto
-            if (segments.length >= 5 && segments[2] == 'expense' && segments[4] == 'edit') {
-              final groupId = segments[1];
-              final expenseId = segments[3];
-              return MaterialPageRoute(
-                builder: (context) => EditExpenseScreen(
-                  groupId: groupId,
-                  expenseId: expenseId,
-                ),
-                settings: settings,
-              );
-            }
-            
-            // Ruta para ver detalle de un gasto
-            if (segments.length >= 4 && segments[2] == 'expense') {
-              final groupId = segments[1];
-              final expenseId = segments[3];
-              return MaterialPageRoute(
-                builder: (context) => ExpenseDetailScreen(
-                  groupId: groupId,
-                  expenseId: expenseId,
-                ),
-                settings: settings,
-              );
-            }
-            
-            // Ruta para ver detalle de un grupo
-            if (segments.length == 2) {
-              final groupId = segments[1];
-              return MaterialPageRoute(
-                builder: (context) {
-                  // Proporcionar ExpenseProvider aquí, específico para esta instancia de GroupDetailScreen
-                  return ChangeNotifierProvider<ExpenseProvider>(
-                    create: (_) => ExpenseProvider(),
-                    child: FutureBuilder(
-                      future: FirestoreService().getGroup(groupId).first,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            // Todas las rutas bajo /group/ compartirán esta instancia de ExpenseProvider
+            return MaterialPageRoute(
+              settings: settings, // Pasar settings al MaterialPageRoute
+              builder: (context) {
+                return ChangeNotifierProvider<ExpenseProvider>(
+                  create: (_) => ExpenseProvider(),
+                  // Usar un Builder para obtener un nuevo contexto que tenga ExpenseProvider
+                  // y para que el GroupModel (si es necesario para el provider) se pueda obtener aquí.
+                  child: Builder(
+                    builder: (context) {
+                      final uri = Uri.parse(settings.name!);
+                      final segments = uri.pathSegments; // e.g. group, groupID, expense, expenseID, edit
+
+                      // Ruta para editar un gasto: /group/{groupId}/expense/{expenseId}/edit
+                      if (segments.length == 5 && segments[0] == 'group' && segments[2] == 'expense' && segments[4] == 'edit') {
+                        final groupId = segments[1];
+                        final expenseId = segments[3];
+
+                        // Solo proceder si groupId y expenseId no están vacíos.
+                        if (groupId.isNotEmpty && expenseId.isNotEmpty) {
+                          // EditExpenseScreen ahora tendrá acceso a ExpenseProvider
+                          return EditExpenseScreen(
+                            groupId: groupId,
+                            expenseId: expenseId,
+                          );
                         }
-                        if (!snapshot.hasData || snapshot.data == null) {
-                          return const Scaffold(body: Center(child: Text('Group not found')));
-                        }
-                        // GroupDetailScreen ahora tendrá acceso a ExpenseProvider
-                        return GroupDetailScreen(group: snapshot.data!);
-                      },
-                    ),
-                  );
-                },
-                settings: settings,
-              );
-            }
+                        // Si groupId o expenseId están vacíos, esta condición no se cumple
+                        // y el flujo continuará hacia las siguientes comprobaciones de ruta o el fallback.
+                      }
+                      
+                      // Ruta para ver detalle de un gasto: /group/{groupId}/expense/{expenseId}
+                      if (segments.length == 4 && segments[0] == 'group' && segments[2] == 'expense') {
+                        final groupId = segments[1];
+                        final expenseId = segments[3];
+                        // ExpenseDetailScreen ahora tendrá acceso a ExpenseProvider
+                        return ExpenseDetailScreen(
+                          groupId: groupId,
+                          expenseId: expenseId,
+                        );
+                      }
+                      
+                      // Ruta para ver detalle de un grupo: /group/{groupId}
+                      if (segments.length == 2 && segments[0] == 'group') {
+                        final groupId = segments[1];
+                        // GroupDetailScreen necesita los datos del grupo.
+                        // El FutureBuilder para obtener el grupo permanece,
+                        // pero ahora será hijo del ExpenseProvider.
+                        return FutureBuilder(
+                          future: FirestoreService().getGroup(groupId).first,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                            }
+                            if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+                              // Considera registrar snapshot.error si existe
+                              return const Scaffold(body: Center(child: Text('Group not found or error loading group.')));
+                            }
+                            // GroupDetailScreen ahora tendrá acceso a ExpenseProvider
+                            return GroupDetailScreen(group: snapshot.data!);
+                          },
+                        );
+                      }
+                      
+                      // Fallback para rutas /group/ no coincidentes (aunque idealmente todas deberían coincidir)
+                      // Podrías redirigir a una página de error o al dashboard.
+                      return const Scaffold(body: Center(child: Text('Unknown route within group section')));
+                    }
+                  ),
+                );
+              },
+            );
           }
           
-          // Rutas estáticas
+          // Rutas estáticas (sin cambios)
           switch (settings.name) {
             case '/login':
               return MaterialPageRoute(builder: (_) => const LoginScreen());

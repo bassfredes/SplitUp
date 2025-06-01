@@ -137,7 +137,7 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> removeParticipantFromGroup(String groupId, String userIdToRemove, String currentUserId) async {
+  Future<GroupModel> removeParticipantFromGroup(String groupId, String userIdToRemove, String currentUserId) async {
     _loading = true;
     if (!_isDisposed) notifyListeners();
     try {
@@ -148,17 +148,13 @@ class GroupProvider extends ChangeNotifier {
       if (index != -1) {
         _groups[index] = updatedGroup;
       }
-      // Si el grupo se elimina porque el usuario actual fue eliminado (y ya no tiene acceso),
-      // la lista de grupos del usuario actual se refrescará naturalmente
-      // la próxima vez que se llame a loadUserGroups o a través del stream.
-
       // Si el currentUserId es el mismo que userIdToRemove, y el usuario fue removido exitosamente
       // (lo cual no debería pasar si es admin, pero por si acaso),
       // entonces ese grupo ya no debería estar en su lista.
-      // Podríamos removerlo explícitamente de _groups o confiar en loadUserGroups.
       if (currentUserId == userIdToRemove) {
         _groups.removeWhere((g) => g.id == groupId);
       }
+      return updatedGroup; // Devolver el grupo actualizado
       
     } catch (e) {
       print("Error al remover participante en GroupProvider: $e");

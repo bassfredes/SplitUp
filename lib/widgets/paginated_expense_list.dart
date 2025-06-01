@@ -78,10 +78,10 @@ class _PaginatedExpenseListState extends State<PaginatedExpenseList> {
 
         // Caso 1: No hay gastos y no se está cargando nada (ni inicial ni más).
         if (expensesToDisplay.isEmpty && !expenseProvider.loadingExpenses && !expenseProvider.loadingMoreExpenses) {
-          return const Center(child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 32.0), // Añadir padding para que no esté pegado
+          return const Align(
+            alignment: Alignment.centerLeft,
             child: Text('No expenses recorded for this group yet.'),
-          ));
+          );
         }
         
         // Caso 2: No hay gastos aún, pero se está en proceso de carga (inicial o más).
