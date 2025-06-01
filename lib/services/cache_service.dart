@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import '../models/expense_model.dart';
 import '../models/settlement_model.dart';
 import '../models/user_model.dart';
+import 'package:clock/clock.dart';
 
 /// Servicio para manejar el caché de datos y reducir las llamadas a Firestore
 class CacheService {
@@ -21,6 +22,9 @@ class CacheService {
 
   CacheService._internal();
 
+  // Getter para verificar si el servicio está inicializado
+  bool get isInitialized => _initialized;
+
   Future<void> init() async {
     if (!_initialized) {
       _prefs = await SharedPreferences.getInstance();
@@ -31,7 +35,7 @@ class CacheService {
   // Guarda datos en la caché (tanto en memoria como persistente)
   Future<void> setData(String key, dynamic data, {Duration? expiration}) async {
     await init();
-    final expiresAt = DateTime.now().add(expiration ?? defaultExpiration).millisecondsSinceEpoch;
+    final expiresAt = clock.now().add(expiration ?? defaultExpiration).millisecondsSinceEpoch;
     
     // Prepara los datos para la caché, convirtiendo Timestamps si es necesario.
     dynamic dataToCache;
@@ -80,7 +84,7 @@ class CacheService {
       final cachedData = _memoryCache[key];
       final expiresAt = cachedData['expiresAt'] as int;
       
-      if (bypassExpiration || expiresAt > DateTime.now().millisecondsSinceEpoch) {
+      if (bypassExpiration || expiresAt > clock.now().millisecondsSinceEpoch) {
         return cachedData['data'];
       } else {
         _memoryCache.remove(key); // Remover si expiró
@@ -94,7 +98,7 @@ class CacheService {
         final decodedData = jsonDecode(persistentData);
         final expiresAt = decodedData['expiresAt'] as int;
         
-        if (bypassExpiration || expiresAt > DateTime.now().millisecondsSinceEpoch) {
+        if (bypassExpiration || expiresAt > clock.now().millisecondsSinceEpoch) {
           // Guardar en memoria para futuros accesos
           _memoryCache[key] = decodedData;
           return decodedData['data'];
@@ -129,7 +133,7 @@ class CacheService {
     final expiresAt = cachedItem['expiresAt'] as int?;
     if (expiresAt == null) return false;
 
-    return bypassOverride || expiresAt > DateTime.now().millisecondsSinceEpoch; // Usar el parámetro renombrado
+    return bypassOverride || expiresAt > clock.now().millisecondsSinceEpoch; // Usar el parámetro renombrado
   }
 
   // Elimina una clave de la caché
@@ -225,14 +229,26 @@ class CacheService {
   
   // Liquidaciones
   Future<void> cacheSettlements(List<SettlementModel> settlements, String groupId) async {
-    await setData('group_settlements_$groupId', settlements.map((s) => s.toMap()).toList());
+    final list = settlements.map((s) {
+      final map = s.toMap();
+      map['id'] = s.id; // Asegurar que el ID está en el mapa
+      // Convertir Timestamps si es necesario, aunque SettlementModel.toMap ya debería devolver Timestamps
+      // y _convertTimestamps en setData se encargará de convertirlos a epoch para JSON.
+      // No obstante, si SettlementModel.toMap() devolviera DateTime, necesitaríamos convertirlos aquí.
+      // Por ahora, asumimos que toMap() es consistente.
+      return map;
+    }).toList();
+    await setData('group_settlements_$groupId', list);
   }
   
   List<SettlementModel>? getSettlementsFromCache(String groupId) {
     final cachedData = getData('group_settlements_$groupId');
     if (cachedData != null) {
-      return (cachedData as List).map((map) => 
-          SettlementModel.fromMap(Map<String, dynamic>.from(map), map['id'] as String)).toList();
+      return (cachedData as List).map((map) {
+        final settlementMap = Map<String, dynamic>.from(map);
+        // Asegurarse de que el id se pasa correctamente a fromMap
+        return SettlementModel.fromMap(settlementMap, settlementMap['id'] as String);
+      }).toList();
     }
     return null;
   }

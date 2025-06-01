@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:meta/meta.dart'; // Añadir import
+import 'package:meta/meta.dart';
 
 /// Servicio para monitorear el estado de la conectividad y reducir
 /// las operaciones de Firestore cuando el usuario está offline
@@ -20,36 +20,34 @@ class ConnectivityService with WidgetsBindingObserver {
   @visibleForTesting
   static void setInstanceForTest(Connectivity connectivity) {
     _instance = ConnectivityService._internal(connectivity);
+    // Reset initialization state for the new test instance
+    _instance._isInitialized = false; 
   }
 
   factory ConnectivityService() => _instance;
 
-  final Connectivity _connectivity; // Modificado para inyección
+  final Connectivity _connectivity;
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   
-  // Estado de la conectividad
-  bool _hasConnection = true;
+  bool _hasConnection = true; // Asumir conexión inicialmente hasta que se verifique
   bool get hasConnection => _hasConnection;
   
-  // Controlador de stream para notificar cambios
   final _connectionStatusController = StreamController<bool>.broadcast();
   Stream<bool> get connectionStream => _connectionStatusController.stream;
   
-  // Constructor modificado para aceptar Connectivity
-  ConnectivityService._internal(this._connectivity) {
-    _initializeService();
-  }
+  bool _isInitialized = false; // Flag de inicialización
 
-  /// Inicializa el servicio de forma segura
-  Future<void> _initializeService() async {
-    // Registrar observer para eventos de ciclo de vida
+  // Constructor modificado para solo almacenar dependencias
+  ConnectivityService._internal(this._connectivity);
+
+  /// Inicializa el servicio. Debe llamarse antes de usar el servicio.
+  Future<void> init() async {
+    if (_isInitialized) return;
+
     WidgetsBinding.instance.addObserver(this);
-    
-    // Verificar estado inicial
     await _checkInitialConnectivity();
-    
-    // Inicializar suscripción a cambios de conectividad
     _setupSubscription();
+    _isInitialized = true;
   }
   
   /// Configura la suscripción al stream de conectividad
@@ -71,15 +69,27 @@ class ConnectivityService with WidgetsBindingObserver {
       _processConnectivityResult(result);
     } catch (e) {
       if (kDebugMode) {
-        print('Error al verificar conectividad: $e');
+        print('Error al verificar conectividad inicial: $e');
       }
-      _hasConnection = false; // Asumimos desconectado en caso de error
-      _notifyConnectionChange(); // Notificar el cambio
+      // Solo actualiza y notifica si el estado realmente necesita cambiar desde la presunción inicial
+      if (_hasConnection) { // Si se asumía conectado y falla, ahora está desconectado
+        _hasConnection = false;
+        _notifyConnectionChange(); 
+      }
     }
   }
   
   /// Verificar el estado actual de conectividad (para uso externo)
   Future<void> checkConnectivity() async {
+    // Asegurarse de que el servicio esté inicializado si se llama externamente
+    // aunque típicamente init() ya se habrá llamado.
+    if (!_isInitialized) {
+      if (kDebugMode) {
+        print("Advertencia: checkConnectivity llamado antes de init en ConnectivityService.");
+      }
+      // Podríamos forzar una inicialización aquí o lanzar un error.
+      // Por ahora, solo procederá a _checkInitialConnectivity.
+    }
     await _checkInitialConnectivity();
   }
   
