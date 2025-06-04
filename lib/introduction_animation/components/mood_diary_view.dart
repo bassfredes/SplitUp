@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-class MoodDiaryVew extends StatelessWidget {
+class MoodDiaryView extends StatelessWidget {
   final AnimationController animationController;
 
-  const MoodDiaryVew({Key? key, required this.animationController})
+  const MoodDiaryView({Key? key, required this.animationController})
     : super(key: key);
 
   @override
@@ -77,7 +77,7 @@ class MoodDiaryVew extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Mood Dairy",
+                    "Mood Diary",
                     style: TextStyle(fontSize: 26.0, fontWeight: FontWeight.bold),
                   ),
                   SlideTransition(

@@ -5,7 +5,7 @@ import 'components/splash_view.dart';
 import 'components/top_back_skip_view.dart';
 import 'components/welcome_view.dart';
 import 'components/manage_smarter.dart';
-import 'components/mood_diary_vew.dart';
+import 'components/mood_diary_view.dart';
 import 'package:flutter/material.dart';
 
 class IntroductionAnimationScreen extends StatefulWidget {
@@ -73,7 +73,7 @@ class _IntroductionAnimationScreenState
               ManageSmarter(
                 animationController: _animationController!,
               ),
-              MoodDiaryVew(
+              MoodDiaryView(
                 animationController: _animationController!,
               ),
               WelcomeView(
