@@ -10,11 +10,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:clock/clock.dart';
 
+// Helper class to test non-primitive caching
+class _Unsupported {
+  final String value;
+  _Unsupported(this.value);
+}
+
 void main() {
   late CacheService cacheService;
   const String testUserId = 'testUser123';
   const String otherUserId = 'otherUser456';
   final DateTime fixedNow = DateTime(2023, 1, 1, 12, 0, 0);
+
 
   GroupModel createTestGroup(String id, {
     DateTime? createdAt,
@@ -577,6 +584,18 @@ void main() {
           final retrievedListData = cacheService.getData(key) as List<dynamic>;
           final retrievedExpense1Data = retrievedListData[0] as Map<String, dynamic>;
           expect(retrievedExpense1Data['date'], expense1.date.millisecondsSinceEpoch);
+        });
+      });
+    });
+
+    test('setData handles non-primitive objects gracefully', () {
+      fakeAsync((async) {
+        withClock(Clock.fixed(fixedNow), () async {
+          await cacheService.init();
+          const key = 'unsupported';
+          final obj = _Unsupported('v');
+          await cacheService.setData(key, obj);
+          expect(cacheService.getData(key), same(obj));
         });
       });
     });
