@@ -575,6 +575,25 @@ void main() {
     });
   });
 
+  group('createGroup', () {
+    test('should create group and invalidate user group caches', () async {
+      final group = GroupModel(
+        id: 'newGroupId',
+        name: 'New Group',
+        participantIds: ['creator'],
+        adminId: 'creator',
+        currency: 'USD',
+        roles: [ {'uid': 'creator', 'role': 'admin'} ],
+      );
+
+      await firestoreService.createGroup(group);
+
+      final doc = await mockFirestore.collection('groups').doc('newGroupId').get();
+      expect(doc.exists, isTrue);
+      verify(mockCacheService.removeKeysWithPattern('user_groups_')).called(1);
+    });
+  });
+
   group('updateGroup', () {
     test('should update group and invalidate cache', () async {
       final initialGroupId = 'groupToUpdateId';
