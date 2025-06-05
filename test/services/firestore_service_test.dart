@@ -6,6 +6,7 @@ import 'package:splitup_application/models/group_model.dart';
 import 'package:splitup_application/models/expense_model.dart';
 import 'package:splitup_application/models/settlement_model.dart';
 import 'package:splitup_application/models/user_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:splitup_application/services/cache_service.dart';
 import 'package:splitup_application/services/connectivity_service.dart';
 import 'package:splitup_application/services/firestore_service.dart';
@@ -816,6 +817,202 @@ void main() {
       expect(groups.length, 1);
       expect(groups.first.name, 'Test Group');
       verify(mockCacheService.cacheGroups(any, userId)).called(1);
+    });
+  });
+
+  group('Additional methods', () {
+    final groupId = 'extraGroup';
+    final userId = 'extraUser';
+
+    setUp(() async {
+      await mockFirestore.collection('groups').doc(groupId).set(GroupModel(
+        id: groupId,
+        name: 'Extra Group',
+        participantIds: [userId],
+        adminId: userId,
+        currency: 'USD',
+        roles: [ {'uid': userId, 'role': 'admin'} ],
+      ).toMap());
+
+      await mockFirestore.collection('users').doc(userId).set(UserModel(
+        id: userId,
+        name: 'User',
+        email: 'user@example.com',
+      ).toMap());
+    });
+
+    test('getExpensesOnce fetches from Firestore and caches when not cached', () async {
+      final expense = ExpenseModel(
+        id: 'e1',
+        groupId: groupId,
+        description: 'e',
+        amount: 1.0,
+        date: DateTime.now(),
+        participantIds: [userId],
+        payers: [ {'userId': userId, 'amount': 1.0} ],
+        createdBy: userId,
+        splitType: 'equal',
+      );
+      await mockFirestore
+          .collection('groups')
+          .doc(groupId)
+          .collection('expenses')
+          .doc(expense.id)
+          .set(expense.toMap());
+
+      when(mockCacheService.getExpensesFromCache(groupId)).thenReturn(null);
+
+      final expenses = await firestoreService.getExpensesOnce(groupId);
+
+      expect(expenses.length, 1);
+      expect(expenses.first.id, expense.id);
+      verify(mockCacheService.cacheExpenses(any, groupId)).called(1);
+    });
+
+    test('getExpensesOnce returns cached expenses if present', () async {
+      when(mockCacheService.getExpensesFromCache(groupId))
+          .thenReturn([ExpenseModel(
+        id: 'cached',
+        groupId: groupId,
+        description: 'c',
+        amount: 2.0,
+        date: DateTime.now(),
+        participantIds: [userId],
+        payers: [ {'userId': userId, 'amount': 2.0} ],
+        createdBy: userId,
+        splitType: 'equal',
+      )]);
+
+      final expenses = await firestoreService.getExpensesOnce(groupId);
+      expect(expenses.length, 1);
+      expect(expenses.first.id, 'cached');
+      verifyNever(mockCacheService.cacheExpenses(any, any));
+    });
+
+    test('getDocumentSnapshot retrieves document', () async {
+      final doc = await firestoreService.getDocumentSnapshot('groups/$groupId');
+      expect(doc, isNotNull);
+      expect(doc?.id, groupId);
+    });
+
+    test('getExpensesCount returns correct count', () async {
+      await mockFirestore.collection('groups').doc(groupId).collection('expenses')
+          .add({'description': 't', 'amount': 1, 'date': DateTime.now()});
+      await mockFirestore.collection('groups').doc(groupId).collection('expenses')
+          .add({'description': 't2', 'amount': 2, 'date': DateTime.now()});
+
+      final count = await firestoreService.getExpensesCount(groupId);
+      expect(count, 2);
+    });
+
+    test('cleanGroupExpensesAndSettlements removes all docs', () async {
+      await mockFirestore.collection('groups').doc(groupId).collection('expenses')
+          .add({'description': 'e', 'amount': 1, 'date': DateTime.now()});
+      await mockFirestore.collection('groups').doc(groupId).collection('settlements')
+          .add({'amount': 5, 'date': DateTime.now(), 'fromUserId': userId, 'toUserId': userId, 'createdBy': userId, 'status': 'pending'});
+
+      await firestoreService.cleanGroupExpensesAndSettlements(groupId);
+
+      final expSnap = await mockFirestore.collection('groups').doc(groupId).collection('expenses').get();
+      final setSnap = await mockFirestore.collection('groups').doc(groupId).collection('settlements').get();
+      expect(expSnap.docs, isEmpty);
+      expect(setSnap.docs, isEmpty);
+      verify(mockCacheService.removeData('group_expenses_$groupId')).called(1);
+      verify(mockCacheService.removeData('group_settlements_$groupId')).called(1);
+    });
+
+    test('fetchUsersByIds merges cached and remote users', () async {
+      when(mockCacheService.getUsersFromCache([userId, 'u2']))
+          .thenReturn([UserModel(id: userId, name: 'User', email: 'user@example.com')]);
+      await mockFirestore.collection('users').doc('u2').set(UserModel(id: 'u2', name: 'Other', email: 'o@example.com').toMap());
+
+      final users = await firestoreService.fetchUsersByIds([userId, 'u2']);
+      expect(users.length, 2);
+      verify(mockCacheService.cacheUsers(any)).called(1);
+    });
+
+    test('batch operations update, create and delete documents', () async {
+      await mockFirestore.collection('groups').doc('b1').set({'name': 'old'});
+
+      await firestoreService.batchUpdate(updates: [
+        {'path': 'groups/b1', 'data': {'name': 'new'}},
+      ]);
+
+      final updated = await mockFirestore.collection('groups').doc('b1').get();
+      expect(updated.data()?['name'], 'new');
+
+      await firestoreService.batchCreate(creates: [
+        {'path': 'groups/b2', 'data': {'name': 'created'}},
+      ]);
+
+      final created = await mockFirestore.collection('groups').doc('b2').get();
+      expect(created.exists, isTrue);
+
+      await firestoreService.batchDelete(paths: ['groups/b2']);
+      final deleted = await mockFirestore.collection('groups').doc('b2').get();
+      expect(deleted.exists, isFalse);
+    });
+
+    test('getExpensesPaginated returns paged results', () async {
+      final e1 = ExpenseModel(
+        id: 'p1',
+        groupId: groupId,
+        description: 'e1',
+        amount: 1,
+        date: DateTime(2022,1,1),
+        participantIds: [userId],
+        payers: [ {'userId': userId, 'amount': 1.0} ],
+        createdBy: userId,
+        splitType: 'equal',
+      );
+      final e2 = ExpenseModel(
+        id: 'p2',
+        groupId: groupId,
+        description: 'e2',
+        amount: 2,
+        date: DateTime(2022,2,1),
+        participantIds: [userId],
+        payers: [ {'userId': userId, 'amount': 2.0} ],
+        createdBy: userId,
+        splitType: 'equal',
+      );
+      final e3 = ExpenseModel(
+        id: 'p3',
+        groupId: groupId,
+        description: 'e3',
+        amount: 3,
+        date: DateTime(2022,3,1),
+        participantIds: [userId],
+        payers: [ {'userId': userId, 'amount': 3.0} ],
+        createdBy: userId,
+        splitType: 'equal',
+      );
+      await mockFirestore.collection('groups').doc(groupId).collection('expenses')
+          .doc(e1.id).set(e1.toMap());
+      await mockFirestore.collection('groups').doc(groupId).collection('expenses')
+          .doc(e2.id).set(e2.toMap());
+      await mockFirestore.collection('groups').doc(groupId).collection('expenses')
+          .doc(e3.id).set(e3.toMap());
+
+      final first = await firestoreService.getExpensesPaginated(groupId, 2, null);
+      expect(first.length, 2);
+    });
+
+    test('getSettlementsOnce fetches and caches settlements', () async {
+      when(mockCacheService.getSettlementsFromCache(groupId)).thenReturn(null);
+      await mockFirestore.collection('groups').doc(groupId).collection('settlements')
+          .add({
+            'amount': 5,
+            'date': Timestamp.now(),
+            'fromUserId': userId,
+            'toUserId': userId,
+            'status': 'pending',
+            'createdBy': userId,
+          });
+
+      final settlements = await firestoreService.getSettlementsOnce(groupId);
+      expect(settlements.length, 1);
+      verify(mockCacheService.cacheSettlements(any, groupId)).called(1);
     });
   });
 
