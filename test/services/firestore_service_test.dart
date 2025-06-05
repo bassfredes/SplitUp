@@ -739,4 +739,65 @@ void main() {
     });
   });
 
+  group('Retrieval methods', () {
+    final groupId = 'retrievalGroup';
+    final userId = 'testUser';
+
+    setUp(() async {
+      await mockFirestore.collection('groups').doc(groupId).set(GroupModel(
+        id: groupId,
+        name: 'Test Group',
+        participantIds: [userId],
+        adminId: userId,
+        currency: 'USD',
+        roles: [ {'uid': userId, 'role': 'admin'} ],
+      ).toMap());
+    });
+
+    test('getGroupOnce returns cached group if present', () async {
+      when(mockCacheService.getData('group_$groupId'))
+          .thenReturn({'name': 'Cached Group'});
+
+      final group = await firestoreService.getGroupOnce(groupId);
+
+      expect(group.name, 'Cached Group');
+      verify(mockCacheService.getData('group_$groupId')).called(1);
+      verifyNever(mockCacheService.setData(any, any));
+    });
+
+    test('getGroupOnce fetches from Firestore and caches when not cached', () async {
+      when(mockCacheService.getData(any)).thenReturn(null);
+
+      final group = await firestoreService.getGroupOnce(groupId);
+
+      expect(group.name, 'Test Group');
+      verify(mockCacheService.setData('group_$groupId', any)).called(1);
+    });
+
+    test('getGroupOnce throws when offline and not cached', () async {
+      when(mockCacheService.getData(any)).thenReturn(null);
+      when(mockConnectivityService.hasConnection).thenReturn(false);
+
+      expect(() => firestoreService.getGroupOnce(groupId), throwsException);
+    });
+
+    test('getUserGroupsOnce returns cached list if present', () async {
+      when(mockCacheService.getGroupsFromCache(userId))
+          .thenReturn([GroupModel(id: 'cg', name: 'Cached', participantIds: [userId], adminId: userId, roles: [])]);
+
+      final groups = await firestoreService.getUserGroupsOnce(userId);
+      expect(groups.length, 1);
+      expect(groups.first.name, 'Cached');
+    });
+
+    test('getUserGroupsOnce fetches from Firestore and caches when not cached', () async {
+      when(mockCacheService.getGroupsFromCache(userId)).thenReturn(null);
+
+      final groups = await firestoreService.getUserGroupsOnce(userId);
+      expect(groups.length, 1);
+      expect(groups.first.name, 'Test Group');
+      verify(mockCacheService.cacheGroups(any, userId)).called(1);
+    });
+  });
+
 }

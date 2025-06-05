@@ -282,7 +282,7 @@ void main() {
         expect(group.updatedAt, isA<DateTime>()); 
       });
 
-       test('fromMap handles lastExpense with date as int (cache format)', () {
+      test('fromMap handles lastExpense with date as int (cache format)', () {
         final lastExpenseCache = {
           'id': 'expCache',
           'description': 'Cached Expense',
@@ -294,13 +294,32 @@ void main() {
         groupMapWithCachedLastExpense['lastExpense'] = lastExpenseCache;
 
         final group = GroupModel.fromMap(groupMapWithCachedLastExpense, 'group_cache_le');
-        
+
         final expectedLastExpenseModel = Map<String, dynamic>.from(lastExpenseCache);
         // fromMap converts int date in lastExpense to DateTime for the model object
-        expectedLastExpenseModel['date'] = testDate; 
+        expectedLastExpenseModel['date'] = testDate;
         expect(group.lastExpense, expectedLastExpenseModel);
         expect(group.createdAt, isA<DateTime>());
         expect(group.updatedAt, isA<DateTime>());
+      });
+
+      test('fromMap parses createdAt and updatedAt when given as int', () {
+        final mapWithIntDates = Map<String, dynamic>.from(baseGroupMap);
+        mapWithIntDates['createdAt'] = testDateMillis;
+        mapWithIntDates['updatedAt'] = testDateMillis;
+        final group = GroupModel.fromMap(mapWithIntDates, 'group_int_dates');
+        expect(group.createdAt.millisecondsSinceEpoch, testDateMillis);
+        expect(group.updatedAt.millisecondsSinceEpoch, testDateMillis);
+      });
+
+      test('fromMap parses createdAt and updatedAt when given as ISO strings', () {
+        final isoString = testDate.toIso8601String();
+        final mapWithStringDates = Map<String, dynamic>.from(baseGroupMap);
+        mapWithStringDates['createdAt'] = isoString;
+        mapWithStringDates['updatedAt'] = isoString;
+        final group = GroupModel.fromMap(mapWithStringDates, 'group_string_dates');
+        expect(group.createdAt, DateTime.parse(isoString));
+        expect(group.updatedAt, DateTime.parse(isoString));
       });
     });
 
@@ -459,6 +478,47 @@ void main() {
         expect(map['lastExpense']['date'], testTimestamp);
         expect(map['createdAt'], isA<Timestamp>());
         expect(map['updatedAt'], isA<Timestamp>());
+      });
+
+      test('toMap for cache converts Timestamp date to milliseconds', () {
+        final group = GroupModel(
+          id: 'gCache',
+          name: 'n',
+          participantIds: [],
+          adminId: 'a',
+          roles: [],
+          lastExpense: {
+            'id': 'e1',
+            'description': 'ts',
+            'amount': 1.0,
+            'date': testTimestamp,
+          },
+          createdAt: testDate,
+          updatedAt: testDate,
+        );
+        final map = group.toMap(forCache: true);
+        expect(map['lastExpense']['date'], testDateMillis);
+      });
+
+      test('toMap for Firestore converts int date to Timestamp', () {
+        final group = GroupModel(
+          id: 'gFs',
+          name: 'n',
+          participantIds: [],
+          adminId: 'a',
+          roles: [],
+          lastExpense: {
+            'id': 'e1',
+            'description': 'int',
+            'amount': 1.0,
+            'date': testDateMillis,
+          },
+          createdAt: testDate,
+          updatedAt: testDate,
+        );
+        final map = group.toMap(forCache: false);
+        expect(map['lastExpense']['date'], isA<Timestamp>());
+        expect((map['lastExpense']['date'] as Timestamp).millisecondsSinceEpoch, testDateMillis);
       });
 
     });
