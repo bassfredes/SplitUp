@@ -69,7 +69,7 @@ class ConnectivityService with WidgetsBindingObserver {
       _processConnectivityResult(result);
     } catch (e) {
       if (kDebugMode) {
-        print('Error al verificar conectividad inicial: $e');
+        // print('Error al verificar conectividad inicial: $e');
       }
       // Solo actualiza y notifica si el estado realmente necesita cambiar desde la presunción inicial
       if (_hasConnection) { // Si se asumía conectado y falla, ahora está desconectado
@@ -110,7 +110,7 @@ class ConnectivityService with WidgetsBindingObserver {
       
       // Log para depuración
       if (kDebugMode) {
-        print('Estado de conexión cambiado: ${_hasConnection ? 'Conectado' : 'Desconectado'}');
+        // print('Estado de conexión cambiado: ${_hasConnection ? 'Conectado' : 'Desconectado'}');
       }
     }
   }

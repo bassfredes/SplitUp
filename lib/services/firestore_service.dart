@@ -213,12 +213,12 @@ class FirestoreService {
 
     // Invalidar caché para este grupo específico
     await _cache.removeData('group_$groupId');
-    print("Cache invalidated for group: $groupId after adding participant.");
+    // print("Cache invalidated for group: $groupId after adding participant.");
 
     // Opcional: Invalidar la lista de grupos en caché para el usuario invitado,
     // ya que su lista de grupos ha cambiado.
     await _cache.removeData('user_groups_${invitedUser.id}');
-    print("Cache invalidated for user_groups list for user: ${invitedUser.id}");
+    // print("Cache invalidated for user_groups list for user: ${invitedUser.id}");
 
     // Devolver el grupo actualizado obteniéndolo de nuevo (lo que también actualizará la caché si es necesario)
     return await getGroupOnce(groupId);
@@ -387,7 +387,7 @@ class FirestoreService {
     if (expensesSnap.docs.isEmpty) {
       // No hay gastos, no hay nada que hacer.
       await _cache.removeData('group_expenses_$groupId');
-      print("Cache invalidated for group_expenses: $groupId (no expenses found to update).");
+      // print("Cache invalidated for group_expenses: $groupId (no expenses found to update).");
       return;
     }
 
@@ -441,7 +441,7 @@ class FirestoreService {
     }
     
     await _cache.removeData('group_expenses_$groupId');
-    print("Cache invalidated for group_expenses: $groupId after attempting to remove participant from expenses.");
+    // print("Cache invalidated for group_expenses: $groupId after attempting to remove participant from expenses.");
   }
 
   Future<GroupModel> removeParticipantFromGroup(String groupId, String userIdToRemove, String currentUserId) async {
@@ -504,17 +504,17 @@ class FirestoreService {
 
     // Invalidar caché para este grupo específico
     await _cache.removeData('group_$groupId');
-    print("Cache invalidated for group: $groupId after removing participant.");
+    // print("Cache invalidated for group: $groupId after removing participant.");
 
     // Invalidar la lista de grupos en caché para el usuario que fue removido
     await _cache.removeData('user_groups_$userIdToRemove');
-    print("Cache invalidated for user_groups list for user: $userIdToRemove");
+    // print("Cache invalidated for user_groups list for user: $userIdToRemove");
     
     // Invalidar la lista de grupos en caché para el usuario actual (quien realizó la acción),
     // ya que la información del grupo (como la lista de participantes) podría estar desactualizada.
     // Esta invalidación ya estaba, pero es bueno confirmar su relevancia.
     await _cache.removeData('user_groups_$currentUserId');
-    print("Cache invalidated for user_groups list for current user: $currentUserId");
+    // print("Cache invalidated for user_groups list for current user: $currentUserId");
 
     // Devolver el grupo actualizado
     return await getGroupOnce(groupId);
