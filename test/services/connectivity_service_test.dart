@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
@@ -165,6 +166,20 @@ void main() {
       // await checkTransition([ConnectivityResult.wifi], [ConnectivityResult.none], false);
       // await checkTransition([ConnectivityResult.none], [ConnectivityResult.mobile], true);
       service.dispose(); // Asegurarse de que el servicio se deseche si no se usa checkTransition
+    });
+
+    test('didChangeAppLifecycleState triggers connectivity re-check on resume', () async {
+      when(mockConnectivity.checkConnectivity()).thenAnswer((_) async => [ConnectivityResult.none]);
+      final service = createInitializedMockedService(mockConnectivity);
+      await service.init();
+      expect(service.hasConnection, isFalse);
+
+      when(mockConnectivity.checkConnectivity()).thenAnswer((_) async => [ConnectivityResult.ethernet]);
+      service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+
+      await Future.delayed(const Duration(milliseconds: 10));
+      expect(service.hasConnection, isTrue);
+      service.dispose();
     });
   });
 }

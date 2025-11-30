@@ -282,7 +282,7 @@ void main() {
         expect(group.updatedAt, isA<DateTime>()); 
       });
 
-       test('fromMap handles lastExpense with date as int (cache format)', () {
+      test('fromMap handles lastExpense with date as int (cache format)', () {
         final lastExpenseCache = {
           'id': 'expCache',
           'description': 'Cached Expense',
@@ -299,6 +299,16 @@ void main() {
         // fromMap converts int date in lastExpense to DateTime for the model object
         expectedLastExpenseModel['date'] = testDate; 
         expect(group.lastExpense, expectedLastExpenseModel);
+        expect(group.createdAt, isA<DateTime>());
+        expect(group.updatedAt, isA<DateTime>());
+      });
+
+      test('fromMap parses string dates for createdAt and updatedAt', () {
+        final mapWithStringDates = Map<String, dynamic>.from(baseGroupMap);
+        mapWithStringDates['createdAt'] = '2024-05-27T10:30:00.000Z';
+        mapWithStringDates['updatedAt'] = '2024-05-27T12:30:00.000Z';
+
+        final group = GroupModel.fromMap(mapWithStringDates, 'group_string_dates');
         expect(group.createdAt, isA<DateTime>());
         expect(group.updatedAt, isA<DateTime>());
       });

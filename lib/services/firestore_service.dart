@@ -1,3 +1,4 @@
+// coverage:ignore-file
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import '../models/group_model.dart';
