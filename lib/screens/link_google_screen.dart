@@ -27,11 +27,13 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
   Future<void> _linkGoogle() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) throw Exception('No Google account selected');
-      final googleAuth = await googleUser.authentication;
+      final googleSignIn = GoogleSignIn.instance;
+      await googleSignIn.initialize();
+      final googleUser = await googleSignIn.authenticate();
+      final googleAuth = googleUser.authentication;
+      final authorization = await googleUser.authorizationClient.authorizationForScopes(['email', 'profile']);
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
+        accessToken: authorization?.accessToken,
         idToken: googleAuth.idToken,
       );
       await FirebaseAuth.instance.currentUser?.linkWithCredential(credential);

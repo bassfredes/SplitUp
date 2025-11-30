@@ -8,15 +8,16 @@ import 'package:http/http.dart' as http;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   // Iniciar sesión con Google
   Future<UserModel?> signInWithGoogle() async {
-    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-    if (googleUser == null) return null;
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    await _googleSignIn.initialize();
+    final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+    final authorization = await googleUser.authorizationClient.authorizationForScopes(['email', 'profile']);
     final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
+      accessToken: authorization?.accessToken,
       idToken: googleAuth.idToken,
     );
     final userCredential = await _auth.signInWithCredential(credential);
@@ -94,30 +95,9 @@ class AuthService {
           final email = e.email;
           final pendingCred = e.credential;
           if (email != null && pendingCred != null) {
-            // Buscar los métodos de inicio de sesión asociados a ese email
-            final signInMethods = await _auth.fetchSignInMethodsForEmail(email);
-            // Si es Google
-            if (signInMethods.contains('google.com')) {
-              throw FirebaseAuthException(
-                code: 'link-account-google',
-                message: 'Este correo ya está registrado con Google. Inicia sesión con Google y luego vincula GitHub desde tu cuenta.',
-                email: email,
-                credential: pendingCred,
-              );
-            }
-            // Si es email/contraseña
-            if (signInMethods.contains('password')) {
-              throw FirebaseAuthException(
-                code: 'link-account-password',
-                message: 'Este correo ya está registrado con email y contraseña. Inicia sesión con email y luego vincula GitHub desde tu cuenta.',
-                email: email,
-                credential: pendingCred,
-              );
-            }
-            // Otros providers
             throw FirebaseAuthException(
-              code: 'link-account-other',
-              message: 'Este correo ya está registrado con otro método. Inicia sesión con ese método y vincula GitHub desde tu cuenta.',
+              code: 'link-account-exists',
+              message: 'Este correo ya está registrado con otro método. Inicia sesión con ese método y luego vincula GitHub desde tu cuenta.',
               email: email,
               credential: pendingCred,
             );
@@ -239,11 +219,12 @@ class AuthService {
       }
     } else {
       // Android/iOS
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return;
-      final googleAuth = await googleUser.authentication;
+      await _googleSignIn.initialize();
+      final googleUser = await _googleSignIn.authenticate();
+      final googleAuth = googleUser.authentication;
+      final authorization = await googleUser.authorizationClient.authorizationForScopes(['email', 'profile']);
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
+        accessToken: authorization?.accessToken,
         idToken: googleAuth.idToken,
       );
       await user.linkWithCredential(credential);
