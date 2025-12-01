@@ -12,17 +12,33 @@ class AuthService {
 
   // Iniciar sesión con Google
   Future<UserModel?> signInWithGoogle() async {
-    await _googleSignIn.initialize();
-    final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-    final authorization = await googleUser.authorizationClient.authorizationForScopes(['email', 'profile']);
-    final credential = GoogleAuthProvider.credential(
-      accessToken: authorization?.accessToken,
-      idToken: googleAuth.idToken,
-    );
-    final userCredential = await _auth.signInWithCredential(credential);
-    final user = userCredential.user;
+    User? user;
+    if (identical(0, 0.0)) {
+      // Web
+      try {
+        final googleProvider = GoogleAuthProvider();
+        final userCredential = await _auth.signInWithPopup(googleProvider);
+        user = userCredential.user;
+      } catch (e) {
+        print('Error en Google Sign In (Web): $e');
+        return null;
+      }
+    } else {
+      // Mobile
+      await _googleSignIn.initialize();
+      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      final authorization = await googleUser.authorizationClient.authorizationForScopes(['email', 'profile']);
+      final credential = GoogleAuthProvider.credential(
+        accessToken: authorization?.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await _auth.signInWithCredential(credential);
+      user = userCredential.user;
+    }
+
     if (user == null) return null;
+
     // Guardar o actualizar usuario en Firestore
     final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
     final docSnapshot = await userDoc.get();
